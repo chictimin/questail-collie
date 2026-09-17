@@ -40,7 +40,17 @@ QUESTAIL_LLM_MODEL=qwen3:8b
 
 ### 결과만 보고 싶은 경우
 
-LLM 키 없이도 읽을 수 있다. 측정 결과 JSON(`data/results/20260917T041200.json` 1차, `data/results/20260917T045405.json` 2차)이 커밋되어 있어 clone만 하면 된다. 채점 27문항 기준 2차 측정에서 도구 호출 적절성 0.48, 답변 적절성 0.37이다(1차 0.44 / 0.30). 개선 사이클 2회의 기록과 실패 원인 분석은 `REPORT.md` (4)절에 있다.
+LLM 키 없이도 읽을 수 있다. 측정 결과 JSON이 커밋되어 있어 clone만 하면 된다.
+
+| 시점 | 도구 호출 적절성 | 답변 적절성 |
+|---|---|---|
+| 초기 (1차) | 12/27 | 8/27 |
+| 도구 재설계 전 (T1 3회, 공통 26문항) | 11/26 | 10/26 |
+| **최종 (본측정 3회 범위)** | **24~26/27** | **19~20/27** |
+
+답변 지표는 정답지(`data/answer_gold.json`)가 초기부터 바뀌지 않아 직접 비교된다. 도구 지표는 도구를 4종에서 9종으로 재설계하며 기대 도구를 바꿨으므로 직접 비교가 되지 않는다 — 상세와 한계는 `REPORT.md` 최상단 요약에 있다.
+
+개선 페이즈별 기록, 실패 원인 분석, 측정 3회가 겹쳐 실행된 한계는 `REPORT.md` (4)절에 있다.
 
 ## 실행법
 
@@ -58,9 +68,15 @@ pnpm dev              # 데모 서버 (http://localhost:3000)
 그 외 명령어:
 
 ```sh
-pnpm eval      # 평가셋 2지표 측정 (LLM 키 필요)
-pnpm typecheck # 타입 검사
+pnpm eval                                 # 본측정 — 2지표 (LLM 키 필요, 동시성 4에서 약 15분)
+npx tsx src/dryrun.ts                     # 도구 라우팅만 오프라인 채점 (LLM 0회, 초 단위)
+npx tsx src/dryrun.ts --refresh-classify  # 분류 캐시 재생성 (분류 프롬프트를 고쳤을 때만)
+pnpm typecheck                            # 타입 검사
 ```
+
+도구 선택이 결정적 코드라 **LLM 없이 도구 점수를 잴 수 있다.** `dryrun.ts`는 분류 결과를 `data/classify_cache.json`에 고정해두고 라우터만 반복 채점한다. 본측정을 대체하지 않는다 — 답변 지표는 여기서 나오지 않는다. 채점 규칙은 `evaluate.ts`의 `toolScoreFor`를 그대로 import해 본측정과 어긋나지 않는다.
+
+`pnpm eval`에는 **실행 락**이 걸려 있다. 측정이 이미 돌고 있으면 두 번째 실행이 LLM 호출 전에 거부된다. 두 측정이 겹치면 실제 동시성이 배가 되어 회차 간 비교가 오염되기 때문이다.
 
 `pnpm install` 직후 `Ignored build scripts: esbuild@0.28.2` 경고가 뜨지만 실행에 지장이 없다. 별도 조치가 필요 없다.
 
@@ -68,7 +84,7 @@ pnpm typecheck # 타입 검사
 
 챗봇 레이아웃의 단일 화면이다. 질문·답변 말풍선이 위에 누적되고, 아래 입력창에서 계속 물을 수 있다.
 
-- 답변 생성 중에는 단계별 진행 표시가 나온다(카테고리 판정 → 도구 선택과 근거 조립 → 근거로 답변 생성 → 근거 이탈 검사). 각 단계 소요 시간이 함께 찍히고, 끝나면 경로 한 줄로 접힌다.
+- 답변 생성 중에는 단계별 진행 표시가 나온다(카테고리 판정 → 도구 라우팅과 근거 조립 → 근거로 답변 생성 → 근거 이탈 검사). 각 단계 소요 시간이 함께 찍히고, 끝나면 경로 한 줄로 접힌다.
 - 답변 말풍선 아래 작은 글씨 메타 2줄에 분류 결과·confidence·호출한 도구·소요 시간·검증 결과·이관 여부가 붙는다. 위반이 있으면 규칙과 내용이 함께 나온다.
 - 근거는 접기/펼치기 형태다. 접힌 상태에서도 건수가 표시되고, 펼치면 문서 id와 텍스트를 대조할 수 있다.
 - 헤더에 현재 연결된 엔드포인트와 모델이 표시된다.
@@ -89,15 +105,24 @@ pnpm typecheck # 타입 검사
 ```text
 src/
   graph.ts      # LangGraph 파이프라인 (runCollie)
-  nodes/        # classify · assemble · answer · verify · escalate
+  nodes/
+    classify.ts # 카테고리 판정 + 게임명 후보 추출 (LLM)
+    router.ts   # 결정적 도구 라우터 (LLM 없음)
+    tools.ts    # 도구 9종 실행 + 근거 렌더링
+    assemble.ts # 라우터 결과로 근거 조립
+    answer.ts   # 근거로 답변 생성 (LLM)
+    verify.ts   # 근거 이탈 기계 검사
+    escalate.ts # 범위 밖 이관
   context.ts    # CollieDeps 조립 (docs 청킹 + data 로드 + LLM 주입)
   llm.ts        # LLM 엔드포인트 해석 (OpenAI 호환)
   server.ts     # Hono 데모 서버
   prompts.ts    # 프롬프트
-  evaluate.ts   # 평가 스크립트
+  evaluate.ts   # 평가 스크립트 (본측정 · 실행 락 포함)
+  dryrun.ts     # 오프라인 도구 채점 (LLM 0회)
   types.ts      # 타입 계약 (오케스트레이터 전속)
 docs/           # 근거 산문 3종 + 청크 매핑표
 data/mock/      # 합성 목데이터 (아래 고지 참고)
+data/classify_cache.json  # 드라이런용 분류 결과 고정 (본측정에는 쓰지 않는다)
 public/         # 데모 단일 HTML
 vendor/         # @questail/core tarball
 REPORT.md       # 과제 보고서
