@@ -1,0 +1,23 @@
+{
+  "name": "questail-collie",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx src/server.ts",
+    "eval": "tsx src/evaluate.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@langchain/langgraph": "^0.2.0",
+    "@questail/core": "file:./vendor/questail-core-0.2.0.tgz",
+    "dotenv": "^16.4.5",
+    "hono": "^4.13.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
+}
