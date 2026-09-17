@@ -365,6 +365,46 @@ function pad(s: string, n: number): string {
   return s.length >= n ? s : s + ' '.repeat(n - s.length);
 }
 
+/** 경과 표기. 60초 미만이면 "45s", 이상이면 "2m18s". */
+function formatDur(totalSeconds: number): string {
+  const s = Math.floor(totalSeconds);
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m${s % 60}s`;
+}
+
+/** 잔여 추정 표기. "~" + 분 단위 반올림 (예: ~11m, 1분 미만이면 ~45s). */
+function formatEta(totalSeconds: number): string {
+  const s = Math.round(totalSeconds);
+  if (s < 60) return `~${s}s`;
+  return `~${Math.round(s / 60)}m`;
+}
+
+/**
+ * 문항별 진행률 한 줄.
+ * 예: [eval] (3/27) C4-02: tool=1 answer=0 (46.1s) | 누적 tool 0.67 answer 0.33 | 경과 2m18s · 잔여 ~11m
+ * 누적은 지금까지 status=ok인 행만의 평균 (0건이면 "누적 -").
+ * 잔여는 남은 건수 × 지금까지 ok/error 포함 전체 평균 소요시간으로 추정한다.
+ */
+function formatProgress(
+  rows: ExtendedRow[],
+  qaId: string,
+  loopStart: number,
+  total: number,
+  score: string,
+  elapsedMs: number,
+): string {
+  const n = rows.length;
+  const ok = rows.filter((r) => r.status === 'ok');
+  const cumulative =
+    ok.length === 0
+      ? '누적 -'
+      : `누적 tool ${mean(ok, 'toolScore').toFixed(2)} answer ${mean(ok, 'answerScore').toFixed(2)}`;
+  const elapsedSec = (Date.now() - loopStart) / 1000;
+  const avgMs = rows.reduce((sum, r) => sum + r.elapsedMs, 0) / rows.length;
+  const remainSec = ((total - n) * avgMs) / 1000;
+  return `[eval] (${n}/${total}) ${qaId}: ${score} (${(elapsedMs / 1000).toFixed(1)}s) | ${cumulative} | 경과 ${formatDur(elapsedSec)} · 잔여 ${formatEta(remainSec)}`;
+}
+
 function printReport(rows: ExtendedRow[], fewshotSkipped: number): void {
   const ok = rows.filter((r) => r.status === 'ok');
   const errors = rows.filter((r) => r.status === 'error');
@@ -420,6 +460,7 @@ async function runEval(evalPath: string, goldPath: string, onlyTokens: string[],
   const deps: CollieDeps = await getDeps();
   const callLlm = deps.callLlm;
   const rows: ExtendedRow[] = [];
+  const loopStart = Date.now();
   for (const item of targets) {
     const g = gold.get(item.qaId) as AnswerGold;
     const t0 = Date.now();
@@ -449,7 +490,9 @@ async function runEval(evalPath: string, goldPath: string, onlyTokens: string[],
         elapsedMs,
         retried: judged.retried,
       });
-      console.log(`[eval] ${item.qaId}: tool=${toolScore} answer=${judged.answerScore} (${(elapsedMs / 1000).toFixed(1)}s)`);
+      console.log(
+        formatProgress(rows, item.qaId, loopStart, targets.length, `tool=${toolScore} answer=${judged.answerScore}`, elapsedMs),
+      );
     } catch (err) {
       const elapsedMs = Date.now() - t0;
       const msg = err instanceof Error ? err.message : String(err);
@@ -475,7 +518,7 @@ async function runEval(evalPath: string, goldPath: string, onlyTokens: string[],
         elapsedMs,
         retried: err instanceof JudgeFailedError ? err.retried : false,
       });
-      console.log(`[eval] ${item.qaId}: ERROR ${msg} (${(elapsedMs / 1000).toFixed(1)}s)`);
+      console.log(formatProgress(rows, item.qaId, loopStart, targets.length, `ERROR ${msg}`, elapsedMs));
     }
   }
   printReport(rows, fewshotSkipped);
