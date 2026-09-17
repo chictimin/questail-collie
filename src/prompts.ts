@@ -36,10 +36,10 @@ const TOOL_SELECT_BASE = `너는 도구 선택기다. 질문에 답하는 데 �
 - search_docs: 정책·기준 문서 검색. 인자: keywords(배열). "왜 비었나·언제 갱신·별점 기준·장르 정의" 같은 질문에 쓴다.
 
 선택 규칙:
-- 플레이 시간·보유 여부·업적률·마지막 플레이·장르 집계·순위 → lookup_library.
+- 플레이 시간·보유 여부·업적률·마지막 플레이·장르 집계·순위 → lookup_library. 데이터 기준 시각(generated_at)이 언제냐는 질문도 lookup_library다 — 값 자체가 library 인덱스에 있다.
 - 별점·상태·한줄평·기피 사유 → get_game_note.
 - 취향·경향·위시 → get_taste_profile.
-- 수집 정책·갱신 시점·별점 기준·장르 정의·왜 비었나 → search_docs.
+- 수집 정책·갱신 주기·수집 방식·별점 기준·장르 정의·왜 비었나 → search_docs.
 - "왜"·"어떻게"를 묻거나, 기준·정의·정책·사유·출처·수집 여부를 묻거나, 데이터에 값이 없어 보이는 이유를 설명해야 하면 search_docs를 반드시 포함한다. 데이터 조회 도구와 배타적이지 않다 — lookup_library·get_game_note·get_taste_profile과 함께 부르는 것이 정상이다.
 - 게임명은 라이브러리 표기(영문 정식 명칭)로 바꿔 인자에 넣는다. 예: "엘든 링"→"ELDEN RING", "사이버펑크 2077"→"Cyberpunk 2077". 한글 그대로 넣지 않는다.
 
