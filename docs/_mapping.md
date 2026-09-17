@@ -34,6 +34,21 @@
 | D-B games/*.md | HISTORY, SUBJECTIVE |
 | D-C taste-profile.json | TASTE |
 
+## 신규 도구-근거 매핑 (도구 재설계 v1)
+
+> 정본은 도구 재설계 계약의 시그니처표다. 아래는 각 신규 도구의 "반환 근거"가 위 청크 id 중 어느 것과 연결되는지만 적은 것이다.
+> 카테고리는 5개 그대로이며(명세 상한), 위 청크-카테고리 매핑과 청크 수 집계는 바꾸지 않는다.
+
+| 도구 | 반환 근거 | 연결 청크 id |
+|---|---|---|
+| `get_achievement_stats` | 업적 달성률 (없으면 결측 표시) | D-D#업적-제약 |
+| `get_wishlist` | 찜 목록·개수 | D-E#찜-보유-구분 |
+| `find_rating_playtime_gaps` | 플레이타임×별점 교차 상위 | D-E#별점-척도, D-F#미반영-신호 |
+| `get_field_coverage` | 해당 필드 결측 현황 | D-D#수집-범위, D-D#업적-제약, D-E#별점-미입력, D-F#장르-출처 |
+| `describe_schema` | 어느 데이터가 어느 파일·계층에 있나 | D-D#데이터-계층, D-D#저장소-배치, D-E#입력-계층 |
+
+`get_field_coverage`의 field별 대응: `genre`→D-F#장르-출처, `developers`→D-D#수집-범위, `achievement`→D-D#업적-제약, `rating`→D-E#별점-미입력.
+
 ## 카테고리별 연결 청크 수
 
 | 카테고리 | 연결 청크 수 |

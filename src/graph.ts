@@ -87,7 +87,12 @@ export const runCollie: RunCollie = async (question, deps) => {
   const graph = new StateGraph(CollieState)
     .addNode('classify_step', async (state) => {
       emitStep(deps, 'classify');
-      const classify = await classifyQuestion(state.question, deps.callLlm);
+      // 계약 v3: gameTitles 후보용으로 라이브러리 제목 목록을 함께 넘긴다.
+      const classify = await classifyQuestion(
+        state.question,
+        deps.callLlm,
+        deps.library.games.map((g) => g.title),
+      );
       return { classify };
     })
     .addNode('escalate', (state) => {
@@ -96,6 +101,7 @@ export const runCollie: RunCollie = async (question, deps) => {
         category: 'OUT_OF_SCOPE' as const,
         confidence: 0,
         reason: '분류 없음',
+        gameTitles: [],
       };
       // 이관도 측정 정본에 남긴다 — outscope 문항의 toolsUsed가 빈 채로 나오지 않게 한다.
       const toolCalls: ToolCall[] = [
@@ -105,8 +111,14 @@ export const runCollie: RunCollie = async (question, deps) => {
     })
     .addNode('assemble_context', async (state) => {
       emitStep(deps, 'assemble');
-      const category = state.classify?.category ?? 'OUT_OF_SCOPE';
-      const { evidence, toolCalls } = await assembleContext(state.question, category, deps);
+      // 계약 v3: 라우터가 gameTitles를 쓰므로 classify 전체를 넘긴다.
+      const classify = state.classify ?? {
+        category: 'OUT_OF_SCOPE' as const,
+        confidence: 0,
+        reason: '분류 없음',
+        gameTitles: [],
+      };
+      const { evidence, toolCalls } = await assembleContext(state.question, classify, deps);
       return { evidence, toolCalls };
     })
     .addNode('answer_step', async (state) => {

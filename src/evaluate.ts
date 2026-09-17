@@ -35,6 +35,11 @@ const TOOL_NAMES: readonly ToolName[] = [
   'get_game_note',
   'get_taste_profile',
   'search_docs',
+  'get_achievement_stats',
+  'get_wishlist',
+  'find_rating_playtime_gaps',
+  'get_field_coverage',
+  'describe_schema',
   'escalate',
 ];
 
@@ -677,38 +682,45 @@ function flagValue(args: string[], name: string): string | undefined {
   return i >= 0 && i + 1 < args.length ? args[i + 1] : undefined;
 }
 
-const argv = process.argv.slice(2);
-try {
-  if (argv.includes('--self-test')) {
-    const fails = await selfTest();
-    process.exitCode = fails === 0 ? 0 : 1;
-  } else {
-    const onlyRaw = flagValue(argv, '--only');
-    const onlyTokens = onlyRaw === undefined ? [] : onlyRaw.split(',').map((s) => s.trim()).filter((s) => s !== '');
-    const limitRaw = flagValue(argv, '--limit');
-    let limit: number | undefined;
-    if (limitRaw !== undefined) {
-      limit = Number(limitRaw);
-      if (!Number.isInteger(limit) || limit <= 0) throw new Error(`[eval] --limit 값 오류 "${limitRaw}" (1 이상 정수)`);
+// 이 파일을 직접 실행했을 때만 측정을 돌린다.
+// dryrun.ts 등이 toolScoreFor를 import할 때 본측정이 함께 도는 것을 막는다.
+const IS_ENTRY =
+  process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (IS_ENTRY) {
+  const argv = process.argv.slice(2);
+  try {
+    if (argv.includes('--self-test')) {
+      const fails = await selfTest();
+      process.exitCode = fails === 0 ? 0 : 1;
+    } else {
+      const onlyRaw = flagValue(argv, '--only');
+      const onlyTokens = onlyRaw === undefined ? [] : onlyRaw.split(',').map((s) => s.trim()).filter((s) => s !== '');
+      const limitRaw = flagValue(argv, '--limit');
+      let limit: number | undefined;
+      if (limitRaw !== undefined) {
+        limit = Number(limitRaw);
+        if (!Number.isInteger(limit) || limit <= 0) throw new Error(`[eval] --limit 값 오류 "${limitRaw}" (1 이상 정수)`);
+      }
+      const concurrencyRaw = flagValue(argv, '--concurrency');
+      let concurrency = 2;
+      if (concurrencyRaw !== undefined) {
+        concurrency = Number(concurrencyRaw);
+        if (!Number.isInteger(concurrency) || concurrency <= 0)
+          throw new Error(`[eval] --concurrency 값 오류 "${concurrencyRaw}" (1 이상 정수)`);
+      }
+      const runLabel = flagValue(argv, '--run-label') ?? '';
+      await runEval(
+        resolve(flagValue(argv, '--eval') ?? join('data', 'eval_set.csv')),
+        resolve(flagValue(argv, '--gold') ?? join('data', 'answer_gold.json')),
+        onlyTokens,
+        limit,
+        concurrency,
+        runLabel,
+      );
     }
-    const concurrencyRaw = flagValue(argv, '--concurrency');
-    let concurrency = 2;
-    if (concurrencyRaw !== undefined) {
-      concurrency = Number(concurrencyRaw);
-      if (!Number.isInteger(concurrency) || concurrency <= 0)
-        throw new Error(`[eval] --concurrency 값 오류 "${concurrencyRaw}" (1 이상 정수)`);
-    }
-    const runLabel = flagValue(argv, '--run-label') ?? '';
-    await runEval(
-      resolve(flagValue(argv, '--eval') ?? join('data', 'eval_set.csv')),
-      resolve(flagValue(argv, '--gold') ?? join('data', 'answer_gold.json')),
-      onlyTokens,
-      limit,
-      concurrency,
-      runLabel,
-    );
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
   }
-} catch (err) {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exitCode = 1;
 }

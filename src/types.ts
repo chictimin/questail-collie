@@ -52,6 +52,11 @@ export type ToolName =
   | 'get_game_note'
   | 'get_taste_profile'
   | 'search_docs'
+  | 'get_achievement_stats'
+  | 'get_wishlist'
+  | 'find_rating_playtime_gaps'
+  | 'get_field_coverage'
+  | 'describe_schema'
   | 'escalate';
 
 export interface ToolCall {
@@ -67,6 +72,12 @@ export interface ClassifyResult {
   /** 0~1. 임계값 미만이면 escalate 로 간다 — 분류와 이관 판단은 분리한다 */
   confidence: number;
   reason: string;
+  /**
+   * 질문에 등장하는 게임의 라이브러리 정식 표기 (계약 v3).
+   * 전사(해석)는 LLM이, 검증은 라우터가 한다 — 이 배열은 후보일 뿐이며
+   * 인덱스에 없는 표기는 라우터가 버린다. 없으면 빈 배열이다.
+   */
+  gameTitles: string[];
 }
 
 export type ViolationRule =
