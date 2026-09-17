@@ -12,6 +12,7 @@
  */
 
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -684,6 +685,78 @@ function flagValue(args: string[], name: string): string | undefined {
 
 // 이 파일을 직접 실행했을 때만 측정을 돌린다.
 // dryrun.ts 등이 toolScoreFor를 import할 때 본측정이 함께 도는 것을 막는다.
+/**
+ * 측정 중복 실행 방지 락.
+ *
+ * 두 측정이 겹쳐 돌면 실제 동시성이 배가 되어 문항별 지연이 달라지고, 그 차이가
+ * 회차 간 변동 폭에 섞인다(T1 에서 확인. 겹친 회차에서 에러 1건이 발생했다).
+ * "프로세스가 안 보인다"는 관측은 죽었다는 근거가 못 된다 — 출력 버퍼링이나
+ * 프로세스 가시성 문제로 실제로는 돌고 있는데 없어 보일 수 있다. 그래서 재실행
+ * 판단을 사람이나 에이전트의 규율에 맡기지 않고 여기서 막는다.
+ */
+const LOCK_PATH = resolve('data', 'results', '.eval.lock');
+
+interface EvalLock {
+  pid: number;
+  startedAt: string;
+  label: string;
+}
+
+/** 신호 0 은 프로세스를 건드리지 않고 존재 여부만 확인한다. */
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function acquireEvalLock(label: string): void {
+  mkdirSync(dirname(LOCK_PATH), { recursive: true });
+
+  if (existsSync(LOCK_PATH)) {
+    let prev: EvalLock | undefined;
+    try {
+      prev = JSON.parse(readFileSync(LOCK_PATH, 'utf8')) as EvalLock;
+    } catch {
+      prev = undefined; // 깨진 락은 stale 로 본다
+    }
+
+    if (prev && isAlive(prev.pid)) {
+      throw new Error(
+        `[eval] 이미 측정이 돌고 있다 — pid ${prev.pid} · 시작 ${prev.startedAt} · 라벨 "${prev.label}"\n` +
+          '       두 측정이 겹치면 실제 동시성이 배가 되어 지연이 달라지고 회차 간 비교가 오염된다.\n' +
+          '       진행 상황은 그 프로세스의 로그에서 확인한다. 프로세스 목록에 안 보인다는 것은\n' +
+          '       죽었다는 근거가 아니다.\n' +
+          `       정말 중단하려면: kill ${prev.pid} && rm ${LOCK_PATH}`,
+      );
+    }
+
+    if (prev) console.warn(`[eval] stale 락 회수 (pid ${prev.pid} 종료됨)`);
+    unlinkSync(LOCK_PATH);
+  }
+
+  const lock: EvalLock = {
+    pid: process.pid,
+    startedAt: new Date().toISOString(),
+    label: label || '(무라벨)',
+  };
+  writeFileSync(LOCK_PATH, JSON.stringify(lock, null, 2));
+  console.log(`[eval] 락 획득 (pid ${process.pid})`);
+}
+
+/** 내 락일 때만 지운다. stale 회수 뒤 다른 프로세스가 잡은 락을 뺏지 않는다. */
+function releaseEvalLock(): void {
+  try {
+    if (!existsSync(LOCK_PATH)) return;
+    const cur = JSON.parse(readFileSync(LOCK_PATH, 'utf8')) as EvalLock;
+    if (cur.pid === process.pid) unlinkSync(LOCK_PATH);
+  } catch {
+    // 락 해제 실패로 측정 결과를 잃지 않는다
+  }
+}
+
 const IS_ENTRY =
   process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
@@ -710,6 +783,14 @@ if (IS_ENTRY) {
           throw new Error(`[eval] --concurrency 값 오류 "${concurrencyRaw}" (1 이상 정수)`);
       }
       const runLabel = flagValue(argv, '--run-label') ?? '';
+      acquireEvalLock(runLabel);
+      process.on('exit', releaseEvalLock);
+      for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+        process.on(sig, () => {
+          releaseEvalLock();
+          process.exit(130);
+        });
+      }
       await runEval(
         resolve(flagValue(argv, '--eval') ?? join('data', 'eval_set.csv')),
         resolve(flagValue(argv, '--gold') ?? join('data', 'answer_gold.json')),
