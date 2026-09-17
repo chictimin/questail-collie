@@ -21,6 +21,16 @@
   .bubble.user { background: #1a1a1a; color: #fff; border-bottom-right-radius: 4px; }
   .bubble.agent { background: #fff; border: 1px solid #ccc; border-bottom-left-radius: 4px; }
   .bubble.error { background: #fff; border: 1px solid #a31212; color: #a31212; }
+  .bubble.agent code { font-family: monospace; background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .bubble.agent h3 { font-size: 16px; margin: 8px 0 4px; line-height: 1.5; }
+  .bubble.agent h4 { font-size: 15px; margin: 8px 0 4px; line-height: 1.5; }
+  .bubble.agent h5, .bubble.agent h6 { font-size: 14px; margin: 8px 0 4px; line-height: 1.5; }
+  .bubble.agent p { margin: 6px 0; }
+  .bubble.agent ul, .bubble.agent ol { margin: 6px 0; padding-left: 22px; }
+  .bubble.agent li { margin: 2px 0; }
+  .bubble.agent blockquote { margin: 6px 0; padding: 2px 0 2px 10px; border-left: 3px solid #ccc; }
+  .bubble.agent > :first-child { margin-top: 0; }
+  .bubble.agent > :last-child { margin-bottom: 0; }
   .meta { font-size: 12px; color: #777; margin-top: 6px; max-width: 85%; line-height: 1.6; overflow-wrap: break-word; }
   .meta .ok { color: #0a6b1a; }
   .meta .bad { color: #a31212; font-weight: 700; }
@@ -104,6 +114,103 @@
     return String(s).replace(/[&<>"']/g, function (ch) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
     });
+  }
+
+  // ── 분 표기 병기 ("347분" → "347분(5시간 47분)"). 원본 숫자는 지우지 않는다.
+  // 적용 순서: esc → 마크다운 변환 → 이 병기. 최종 HTML에 걸되 태그 영역(<...>)은
+  // 건너뛰므로 태그 이름·속성값이 깨지지 않는다. 뒤에 곧바로 "("가 오면 이미
+  // 병기된 것이므로 건너뛴다 ("347분(5시간 47분)"의 347분이 또 걸리지 않게).
+  // 60분 미만·0분은 병기 없음, 정확히 떨어지면 분 생략 ("120분(2시간)").
+  function fmtMinutes(m) {
+    if (m < 60) return m + "분";
+    var h = Math.floor(m / 60);
+    var r = m % 60;
+    return m + "분(" + h + "시간" + (r ? " " + r + "분" : "") + ")";
+  }
+
+  function annotateMinutes(html) {
+    return html.split(/(<[^>]*>)/g).map(function (part, i) {
+      if (i % 2 === 1) return part;
+      return part.replace(/(\d+)분(?!\()/g, function (m, num) {
+        return fmtMinutes(Number(num));
+      });
+    }).join("");
+  }
+  // XSS 방어 순서: 먼저 전체를 esc()로 이스케이프한 뒤, 그 결과에만 변환을 건다.
+  // 살아남는 태그는 아래에서 직접 만든 것만이다. 이탤릭·표·링크·이미지는 미지원.
+  // ── 답변 말풍선용 최소 마크다운 (제목·볼드·인라인코드·인용·리스트·문단).
+  function mdInline(s) {
+    // 코드 스팬을 먼저 분리해야 ` 안의 **가 볼드로 오인되지 않는다.
+    var parts = s.split(/(`[^`]*`)/g);
+    for (var i = 0; i < parts.length; i++) {
+      if (i % 2 === 1) {
+        parts[i] = "<code>" + parts[i].slice(1, -1) + "</code>";
+      } else {
+        parts[i] = parts[i].replace(/\*\*([^*]+?)\*\*/g, "<strong>$1</strong>");
+      }
+    }
+    return parts.join("");
+  }
+
+  function renderMarkdown(src) {
+    var lines = esc(src).split("\n");
+    var out = [];
+    var para = [];
+    var list = null;
+    var quote = [];
+    var flushPara = function () {
+      if (para.length) { out.push("<p>" + para.join("<br>") + "</p>"); para = []; }
+    };
+    var flushList = function () {
+      if (list) {
+        out.push("<" + list.tag + ">" + list.items.map(function (it) {
+          return "<li>" + it + "</li>";
+        }).join("") + "</" + list.tag + ">");
+        list = null;
+      }
+    };
+    var flushQuote = function () {
+      if (quote.length) { out.push("<blockquote>" + quote.join("<br>") + "</blockquote>"); quote = []; }
+    };
+    var openList = function (tag, item) {
+      if (!list || list.tag !== tag) { flushList(); list = { tag: tag, items: [] }; }
+      list.items.push(item);
+    };
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var m;
+      if (/^\s*$/.test(line)) {
+        flushPara(); flushList(); flushQuote();
+        continue;
+      }
+      // #~#### → h3~h6 (말풍선 안이라 h1/h2 미사용). ##### 이상은 미지원이라 평문 취급.
+      if ((m = line.match(/^(#{1,4})\s+(.*)$/))) {
+        flushPara(); flushList(); flushQuote();
+        var lv = m[1].length + 2;
+        out.push("<h" + lv + ">" + mdInline(m[2]) + "</h" + lv + ">");
+        continue;
+      }
+      // esc()로 > 가 &gt; 가 된 뒤이므로 &gt; 로 판정한다.
+      if ((m = line.match(/^&gt; ?(.*)$/))) {
+        flushPara(); flushList();
+        quote.push(mdInline(m[1]));
+        continue;
+      }
+      if ((m = line.match(/^[-*]\s+(.*)$/))) {
+        flushPara(); flushQuote();
+        openList("ul", mdInline(m[1]));
+        continue;
+      }
+      if ((m = line.match(/^\d+\.\s+(.*)$/))) {
+        flushPara(); flushQuote();
+        openList("ol", mdInline(m[1]));
+        continue;
+      }
+      flushList(); flushQuote();
+      para.push(mdInline(line));
+    }
+    flushPara(); flushList(); flushQuote();
+    return out.join("");
   }
 
   function scrollBottom() {
@@ -200,6 +307,15 @@
     agentEl.appendChild(d);
   }
 
+  // 답변 말풍선 전용. esc → 마크다운 변환 → 분 병기 순서로 렌더링한다.
+  // 모델 출력에 섞인 태그는 텍스트로 보인다. 질문·에러 말풍선은 평문(textContent) 유지.
+  function appendAnswerBubble(agentEl, text) {
+    var d = document.createElement("div");
+    d.className = "bubble agent";
+    d.innerHTML = annotateMinutes(renderMarkdown(text));
+    agentEl.appendChild(d);
+  }
+
   // 답변 말풍선 아래 메타 2줄: 분류·도구·시간 / 검증·이관
   function metaHtml(r) {
     var tools = (r.toolsUsed && r.toolsUsed.length) ? r.toolsUsed.join(", ") : "없음";
@@ -242,7 +358,7 @@
 
   function fillMessage(agentEl, r) {
     collapseProgress();
-    appendBubble(agentEl, r.answer || "(빈 답변)", null);
+    appendAnswerBubble(agentEl, r.answer || "(빈 답변)");
     agentEl.insertAdjacentHTML("beforeend", metaHtml(r) + violationsHtml(r) + evidenceHtml(r));
     scrollBottom();
   }
