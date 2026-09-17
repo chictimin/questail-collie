@@ -1,0 +1,893 @@
+{
+  "timestamp": "20260917T071057",
+  "evalFile": "data/eval_set.csv",
+  "goldFile": "data/answer_gold.json",
+  "runLabel": "t1-run1",
+  "concurrency": 4,
+  "temperature": 0,
+  "totals": {
+    "attempted": 27,
+    "scored": 27,
+    "errors": 0,
+    "errorRate": 0,
+    "meanExcludesErrors": true,
+    "tool": 0.4444444444444444,
+    "answer": 0.37037037037037035
+  },
+  "byCategory": {
+    "HISTORY": {
+      "n": 6,
+      "tool": 0.3333333333333333,
+      "answer": 0.3333333333333333
+    },
+    "TASTE": {
+      "n": 6,
+      "tool": 0.3333333333333333,
+      "answer": 0.16666666666666666
+    },
+    "SUBJECTIVE": {
+      "n": 5,
+      "tool": 0.6,
+      "answer": 0.4
+    },
+    "DATA_OPS": {
+      "n": 5,
+      "tool": 0.2,
+      "answer": 0.2
+    },
+    "OUT_OF_SCOPE": {
+      "n": 5,
+      "tool": 0.8,
+      "answer": 0.8
+    }
+  },
+  "rows": [
+    {
+      "qaId": "C1-01",
+      "toolScore": 1,
+      "answerScore": 0,
+      "actualTools": [
+        "lookup_library"
+      ],
+      "missedFacts": [
+        "Cyberpunk 2077의 플레이타임은 20855분(약 347시간)이다"
+      ],
+      "violatedTaboos": [],
+      "category": "HISTORY",
+      "split": "eval",
+      "expectedTools": [
+        "lookup_library"
+      ],
+      "question": "사이버펑크 2077 몇 시간 했어?",
+      "status": "ok",
+      "answer": "사이버펑크 2077의 플레이타임은 **20,855분**입니다. 근거에 시간 단위로의 환산 값은 없습니다.",
+      "predictedCategory": "HISTORY",
+      "confidence": 0.99,
+      "escalated": false,
+      "toolsUsed": [
+        "lookup_library"
+      ],
+      "evidenceIds": [
+        "D-A#lookup:0"
+      ],
+      "elapsedMs": 123026,
+      "retried": false
+    },
+    {
+      "qaId": "C1-02",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "lookup_library"
+      ],
+      "missedFacts": [
+        "Steam 프로필의 게임 세부정보 공개 설정이 꺼져 있으면 업적 조회가 403으로 실패하기 때문이다"
+      ],
+      "violatedTaboos": [],
+      "category": "HISTORY",
+      "split": "eval",
+      "expectedTools": [
+        "lookup_library",
+        "search_docs"
+      ],
+      "question": "내 업적 달성률 제일 높은 게임이 뭐야?",
+      "status": "ok",
+      "answer": "근거에 업적 달성률에 대한 내용이 없어, 답할 수 없습니다.",
+      "predictedCategory": "HISTORY",
+      "confidence": 0.95,
+      "escalated": false,
+      "toolsUsed": [
+        "lookup_library"
+      ],
+      "evidenceIds": [
+        "D-A#lookup:0"
+      ],
+      "elapsedMs": 161437,
+      "retried": false
+    },
+    {
+      "qaId": "C1-04",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "lookup_library"
+      ],
+      "missedFacts": [
+        "Hades II는 보유한 게임이 아니라 찜(위시리스트) 목록에 있는 게임이다"
+      ],
+      "violatedTaboos": [
+        "찜이라는 사실을 밝히지 않고 플레이타임만 답하기"
+      ],
+      "category": "HISTORY",
+      "split": "eval",
+      "expectedTools": [
+        "lookup_library",
+        "get_game_note",
+        "search_docs"
+      ],
+      "question": "Hades II 얼마나 플레이했어?",
+      "status": "ok",
+      "answer": "Hades II에 대한 플레이 기록은 근거 텍스트에 없습니다.",
+      "predictedCategory": "HISTORY",
+      "confidence": 0.9,
+      "escalated": false,
+      "toolsUsed": [
+        "lookup_library"
+      ],
+      "evidenceIds": [
+        "D-A#lookup:0"
+      ],
+      "elapsedMs": 111445,
+      "retried": false
+    },
+    {
+      "qaId": "C1-05",
+      "toolScore": 1,
+      "answerScore": 1,
+      "actualTools": [
+        "lookup_library"
+      ],
+      "missedFacts": [],
+      "violatedTaboos": [],
+      "category": "HISTORY",
+      "split": "eval",
+      "expectedTools": [
+        "lookup_library"
+      ],
+      "question": "스타듀밸리 총 플레이타임이 몇 분이야?",
+      "status": "ok",
+      "answer": "스타듀밸리의 총 플레이타임은 **5052분**입니다.",
+      "predictedCategory": "HISTORY",
+      "confidence": 0.9,
+      "escalated": false,
+      "toolsUsed": [
+        "lookup_library"
+      ],
+      "evidenceIds": [
+        "D-A#lookup:0"
+      ],
+      "elapsedMs": 105940,
+      "retried": false
+    },
+    {
+      "qaId": "C1-06",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "lookup_library"
+      ],
+      "missedFacts": [
+        "업적 데이터는 전 게임이 공백이다"
+      ],
+      "violatedTaboos": [],
+      "category": "HISTORY",
+      "split": "eval",
+      "expectedTools": [
+        "lookup_library",
+        "search_docs"
+      ],
+      "question": "시드 마이어 문명 6 업적 달성률이 몇 %야?",
+      "status": "ok",
+      "answer": "근거에 업적 달성률에 대한 정보가 없습니다.",
+      "predictedCategory": "HISTORY",
+      "confidence": 0.95,
+      "escalated": false,
+      "toolsUsed": [
+        "lookup_library"
+      ],
+      "evidenceIds": [
+        "D-A#lookup:0"
+      ],
+      "elapsedMs": 92336,
+      "retried": false
+    },
+    {
+      "qaId": "C1-07",
+      "toolScore": 0,
+      "answerScore": 1,
+      "actualTools": [
+        "get_taste_profile"
+      ],
+      "missedFacts": [],
+      "violatedTaboos": [],
+      "category": "HISTORY",
+      "split": "eval",
+      "expectedTools": [
+        "get_taste_profile",
+        "search_docs"
+      ],
+      "question": "위시리스트에 게임이 몇 개 담겨 있어?",
+      "status": "ok",
+      "answer": "위시리스트에 51건의 게임이 담겨 있습니다.",
+      "predictedCategory": "HISTORY",
+      "confidence": 0.8,
+      "escalated": false,
+      "toolsUsed": [
+        "get_taste_profile"
+      ],
+      "evidenceIds": [
+        "D-C#profile"
+      ],
+      "elapsedMs": 66540,
+      "retried": false
+    },
+    {
+      "qaId": "C2-01",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "get_taste_profile"
+      ],
+      "missedFacts": [
+        "이 값은 플레이타임에서 유도된 가중치이지 사용자가 선언한 선호가 아니다"
+      ],
+      "violatedTaboos": [],
+      "category": "TASTE",
+      "split": "eval",
+      "expectedTools": [
+        "get_taste_profile",
+        "search_docs"
+      ],
+      "question": "내가 제일 좋아하는 장르가 뭐야?",
+      "status": "ok",
+      "answer": "근거에 따르면, 당신의 상위 장르는 **액션(0.212)**이 가장 높습니다. 다음으로는 어드벤처(0.19), 인디(0.177), RPG(0.165), 전략(0.091) 순입니다.",
+      "predictedCategory": "TASTE",
+      "confidence": 1,
+      "escalated": false,
+      "toolsUsed": [
+        "get_taste_profile"
+      ],
+      "evidenceIds": [
+        "D-C#profile"
+      ],
+      "elapsedMs": 72391,
+      "retried": false
+    },
+    {
+      "qaId": "C2-02",
+      "toolScore": 1,
+      "answerScore": 1,
+      "actualTools": [
+        "get_taste_profile"
+      ],
+      "missedFacts": [],
+      "violatedTaboos": [],
+      "category": "TASTE",
+      "split": "eval",
+      "expectedTools": [
+        "get_taste_profile"
+      ],
+      "question": "내 플레이타임 분포가 어떻게 돼?",
+      "status": "ok",
+      "answer": "근거에 따르면, 플레이타임 분포는 다음과 같습니다.\n\n- 최소: 0\n- Q1: 165.8\n- 중앙값: 1162.5\n- Q3: 3805\n- 최대: 20855",
+      "predictedCategory": "TASTE",
+      "confidence": 0.9,
+      "escalated": false,
+      "toolsUsed": [
+        "get_taste_profile"
+      ],
+      "evidenceIds": [
+        "D-C#profile"
+      ],
+      "elapsedMs": 173671,
+      "retried": true
+    },
+    {
+      "qaId": "C2-03",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "get_taste_profile"
+      ],
+      "missedFacts": [
+        "이는 상위 장르와 겹치는데, 모수가 큰 장르일수록 기피 집계에도 등장하기 쉬우므로 정상이다",
+        "두 지표는 서로 다른 모수를 센 것이다"
+      ],
+      "violatedTaboos": [],
+      "category": "TASTE",
+      "split": "eval",
+      "expectedTools": [
+        "get_taste_profile",
+        "search_docs"
+      ],
+      "question": "내가 싫어하는 장르는 뭐야?",
+      "status": "ok",
+      "answer": "근거에 따르면, 당신이 싫어하는(기피하는) 장르는 **액션, 어드벤처, 인디**입니다.",
+      "predictedCategory": "SUBJECTIVE",
+      "confidence": 0.95,
+      "escalated": false,
+      "toolsUsed": [
+        "get_taste_profile"
+      ],
+      "evidenceIds": [
+        "D-C#profile"
+      ],
+      "elapsedMs": 109956,
+      "retried": false
+    },
+    {
+      "qaId": "C2-04",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "lookup_library"
+      ],
+      "missedFacts": [
+        "Team Fortress 2가 해당한다",
+        "플레이타임 1292분에 별점은 3점이다"
+      ],
+      "violatedTaboos": [],
+      "category": "TASTE",
+      "split": "eval",
+      "expectedTools": [
+        "get_taste_profile",
+        "get_game_note",
+        "search_docs"
+      ],
+      "question": "오래 플레이했는데 별점은 낮은, 습관적으로 붙잡은 게임이 있어?",
+      "status": "ok",
+      "answer": "근거에 별점 정보가 없어서 해당 조건으로 게임을 특정할 수 없습니다.",
+      "predictedCategory": "SUBJECTIVE",
+      "confidence": 0.7,
+      "escalated": false,
+      "toolsUsed": [
+        "lookup_library"
+      ],
+      "evidenceIds": [
+        "D-A#lookup:0"
+      ],
+      "elapsedMs": 212808,
+      "retried": false
+    },
+    {
+      "qaId": "C2-05",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "lookup_library",
+        "get_taste_profile"
+      ],
+      "missedFacts": [
+        "Assassin's Creed Odyssey가 해당한다",
+        "플레이타임 396분에 별점은 4점이다"
+      ],
+      "violatedTaboos": [],
+      "category": "TASTE",
+      "split": "eval",
+      "expectedTools": [
+        "get_taste_profile",
+        "get_game_note",
+        "search_docs"
+      ],
+      "question": "짧게 플레이했는데 별점이 높은, 강렬했던 게임이 뭐야?",
+      "status": "ok",
+      "answer": "근거가 없습니다.",
+      "predictedCategory": "SUBJECTIVE",
+      "confidence": 0.85,
+      "escalated": false,
+      "toolsUsed": [
+        "lookup_library",
+        "get_taste_profile"
+      ],
+      "evidenceIds": [
+        "D-A#lookup:0",
+        "D-C#profile"
+      ],
+      "elapsedMs": 165637,
+      "retried": false
+    },
+    {
+      "qaId": "C2-06",
+      "toolScore": 1,
+      "answerScore": 0,
+      "actualTools": [
+        "lookup_library"
+      ],
+      "missedFacts": [
+        "Pummel Party이며 플레이타임은 4571분이다"
+      ],
+      "violatedTaboos": [],
+      "category": "TASTE",
+      "split": "eval",
+      "expectedTools": [
+        "lookup_library"
+      ],
+      "question": "캐주얼 장르 게임 중에서 제일 오래 플레이한 건 뭐야?",
+      "status": "ok",
+      "answer": "근거가 없다.\n\n라이브러리에서 캐주얼 장르 게임을 조회한 결과, 조건에 맞는 게임이 없습니다.",
+      "predictedCategory": "HISTORY",
+      "confidence": 0.9,
+      "escalated": false,
+      "toolsUsed": [
+        "lookup_library"
+      ],
+      "evidenceIds": [
+        "D-A#lookup:0"
+      ],
+      "elapsedMs": 52743,
+      "retried": false
+    },
+    {
+      "qaId": "C3-01",
+      "toolScore": 1,
+      "answerScore": 1,
+      "actualTools": [
+        "get_game_note"
+      ],
+      "missedFacts": [],
+      "violatedTaboos": [],
+      "category": "SUBJECTIVE",
+      "split": "eval",
+      "expectedTools": [
+        "get_game_note"
+      ],
+      "question": "엘든 링에 별점 몇 점 줬지?",
+      "status": "ok",
+      "answer": "별점 3.5점입니다.",
+      "predictedCategory": "SUBJECTIVE",
+      "confidence": 0.98,
+      "escalated": false,
+      "toolsUsed": [
+        "get_game_note"
+      ],
+      "evidenceIds": [
+        "D-B#note:eldenring"
+      ],
+      "elapsedMs": 68277,
+      "retried": false
+    },
+    {
+      "qaId": "C3-02",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "get_game_note"
+      ],
+      "missedFacts": [
+        "Euro Truck Simulator 2에는 별점이 입력되어 있지 않다",
+        "미입력은 0점이나 낮은 평가가 아니라 평가 없음이다"
+      ],
+      "violatedTaboos": [],
+      "category": "SUBJECTIVE",
+      "split": "eval",
+      "expectedTools": [
+        "get_game_note",
+        "search_docs"
+      ],
+      "question": "Euro Truck Simulator 2 별점 몇 점 줬어?",
+      "status": "ok",
+      "answer": "근거에서 Euro Truck Simulator 2의 별점에 대한 정보는 확인할 수 없습니다.",
+      "predictedCategory": "SUBJECTIVE",
+      "confidence": 0.95,
+      "escalated": false,
+      "toolsUsed": [
+        "get_game_note"
+      ],
+      "evidenceIds": [
+        "D-B#note:eurotrucksimulator2"
+      ],
+      "elapsedMs": 134514,
+      "retried": false
+    },
+    {
+      "qaId": "C3-04",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "get_game_note"
+      ],
+      "missedFacts": [
+        "미입력은 0점이나 낮은 평가가 아니라 평가 없음이다"
+      ],
+      "violatedTaboos": [],
+      "category": "SUBJECTIVE",
+      "split": "eval",
+      "expectedTools": [
+        "get_game_note",
+        "search_docs"
+      ],
+      "question": "발더스 게이트 3에 별점 몇 점 줬어?",
+      "status": "ok",
+      "answer": "별점에 대한 정보는 근거에 없습니다.",
+      "predictedCategory": "SUBJECTIVE",
+      "confidence": 0.95,
+      "escalated": false,
+      "toolsUsed": [
+        "get_game_note"
+      ],
+      "evidenceIds": [
+        "D-B#note:baldur'sgate3"
+      ],
+      "elapsedMs": 70612,
+      "retried": false
+    },
+    {
+      "qaId": "C3-05",
+      "toolScore": 1,
+      "answerScore": 0,
+      "actualTools": [
+        "get_game_note",
+        "lookup_library"
+      ],
+      "missedFacts": [
+        "사유는 아트 스타일이 취향과 다르다는 것이다"
+      ],
+      "violatedTaboos": [],
+      "category": "SUBJECTIVE",
+      "split": "eval",
+      "expectedTools": [
+        "get_game_note",
+        "lookup_library"
+      ],
+      "question": "할로우나이트는 왜 그만뒀어? 얼마나 플레이했는데?",
+      "status": "ok",
+      "answer": "할로우나이트를 그만둔 이유에 대해서는 근거에 기록되어 있지 않아요.  \n\n플레이타임은 **26분**으로 기록되어 있습니다.",
+      "predictedCategory": "SUBJECTIVE",
+      "confidence": 0.6,
+      "escalated": false,
+      "toolsUsed": [
+        "get_game_note",
+        "lookup_library"
+      ],
+      "evidenceIds": [
+        "D-B#note:hollowknight:silksong",
+        "D-A#lookup:0"
+      ],
+      "elapsedMs": 78298,
+      "retried": false
+    },
+    {
+      "qaId": "C3-06",
+      "toolScore": 1,
+      "answerScore": 1,
+      "actualTools": [
+        "get_game_note"
+      ],
+      "missedFacts": [],
+      "violatedTaboos": [],
+      "category": "SUBJECTIVE",
+      "split": "eval",
+      "expectedTools": [
+        "get_game_note"
+      ],
+      "question": "데이브 더 다이버 한줄평에 뭐라고 썼어?",
+      "status": "ok",
+      "answer": "데이브 더 다이버의 한줄평은 \"난이도는 높은데 중독성이 있음\"이라고 써 있습니다.",
+      "predictedCategory": "SUBJECTIVE",
+      "confidence": 0.92,
+      "escalated": false,
+      "toolsUsed": [
+        "get_game_note"
+      ],
+      "evidenceIds": [
+        "D-B#note:davethediver"
+      ],
+      "elapsedMs": 54635,
+      "retried": false
+    },
+    {
+      "qaId": "C4-01",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "lookup_library"
+      ],
+      "missedFacts": [
+        "장르 정보가 비어 있는 게임이 4건 있다",
+        "Muck, Crab Game, 3DMark, Wallpaper Engine이다"
+      ],
+      "violatedTaboos": [],
+      "category": "DATA_OPS",
+      "split": "eval",
+      "expectedTools": [
+        "lookup_library",
+        "search_docs"
+      ],
+      "question": "장르 정보가 비어 있는 게임이 있어?",
+      "status": "ok",
+      "answer": "근거에 장르 정보가 포함되어 있지 않아서, 장르가 비어 있는 게임이 있는지 판단할 수 없습니다.",
+      "predictedCategory": "DATA_OPS",
+      "confidence": 1,
+      "escalated": false,
+      "toolsUsed": [
+        "lookup_library"
+      ],
+      "evidenceIds": [
+        "D-A#lookup:0"
+      ],
+      "elapsedMs": 136332,
+      "retried": false
+    },
+    {
+      "qaId": "C4-02",
+      "toolScore": 1,
+      "answerScore": 0,
+      "actualTools": [
+        "lookup_library"
+      ],
+      "missedFacts": [
+        "데이터 기준 시각은 2026-08-17이다"
+      ],
+      "violatedTaboos": [],
+      "category": "DATA_OPS",
+      "split": "eval",
+      "expectedTools": [
+        "lookup_library"
+      ],
+      "question": "이 데이터 마지막으로 갱신된 게 언제야?",
+      "status": "ok",
+      "answer": "근거가 없다.",
+      "predictedCategory": "DATA_OPS",
+      "confidence": 0.9,
+      "escalated": false,
+      "toolsUsed": [
+        "lookup_library"
+      ],
+      "evidenceIds": [
+        "D-A#lookup:0"
+      ],
+      "elapsedMs": 228642,
+      "retried": false
+    },
+    {
+      "qaId": "C4-04",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "lookup_library"
+      ],
+      "missedFacts": [
+        "developers 항목은 전량 비어 있다"
+      ],
+      "violatedTaboos": [],
+      "category": "DATA_OPS",
+      "split": "eval",
+      "expectedTools": [
+        "lookup_library",
+        "search_docs"
+      ],
+      "question": "라이브러리에서 개발사 정보가 있는 게임이 있어?",
+      "status": "ok",
+      "answer": "근거 텍스트에서 개발사 정보는 확인할 수 없습니다. 주어진 목록에는 게임명, 플랫폼/ID, 플레이타임, 장르, 마지막 플레이 날짜만 기재되어 있습니다.",
+      "predictedCategory": "DATA_OPS",
+      "confidence": 0.8,
+      "escalated": false,
+      "toolsUsed": [
+        "lookup_library"
+      ],
+      "evidenceIds": [
+        "D-A#lookup:0"
+      ],
+      "elapsedMs": 82158,
+      "retried": false
+    },
+    {
+      "qaId": "C4-05",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "search_docs"
+      ],
+      "missedFacts": [
+        "별점은 library.md에서 볼 수 없다",
+        "별점의 정본은 게임별 노트다"
+      ],
+      "violatedTaboos": [
+        "library.md에 별점 열이 있다는 답변"
+      ],
+      "category": "DATA_OPS",
+      "split": "eval",
+      "expectedTools": [
+        "lookup_library",
+        "get_game_note",
+        "search_docs"
+      ],
+      "question": "별점은 library.md에서 보면 돼?",
+      "status": "ok",
+      "answer": "별점은 **library.md에서 확인**할 수 있습니다.\n\n근거에 따르면 별점은 수기로 작성되어 **md 파일에 기록**되며, 코어는 **md에 적힌 rating을 읽기·보존·분석·검증**하는 역할을 합니다. 따라서 별점 정보를 보려면 해당 게임의 md 파일(예: library.md)을 조회해야 합니다.",
+      "predictedCategory": "SUBJECTIVE",
+      "confidence": 0.9,
+      "escalated": false,
+      "toolsUsed": [
+        "search_docs"
+      ],
+      "evidenceIds": [
+        "D-E#별점-척도",
+        "D-E#별점-미입력",
+        "D-E#입력-계층"
+      ],
+      "elapsedMs": 63956,
+      "retried": false
+    },
+    {
+      "qaId": "C4-06",
+      "toolScore": 0,
+      "answerScore": 1,
+      "actualTools": [
+        "search_docs"
+      ],
+      "missedFacts": [],
+      "violatedTaboos": [],
+      "category": "DATA_OPS",
+      "split": "eval",
+      "expectedTools": [
+        "lookup_library",
+        "search_docs"
+      ],
+      "question": "Muck 장르가 비어 있는데 원래 장르 정보는 어디서 가져오는 거야?",
+      "status": "ok",
+      "answer": "장르 정보는 Steam의 `appdetails`에서 자동 수집됩니다. 다만, 근거에 Muck 게임에 대한 구체적인 정보는 없습니다.",
+      "predictedCategory": "DATA_OPS",
+      "confidence": 0.9,
+      "escalated": false,
+      "toolsUsed": [
+        "search_docs"
+      ],
+      "evidenceIds": [
+        "D-D#수집-범위",
+        "D-D#업적-제약",
+        "D-D#데이터-계층"
+      ],
+      "elapsedMs": 83800,
+      "retried": false
+    },
+    {
+      "qaId": "C5-01",
+      "toolScore": 1,
+      "answerScore": 1,
+      "actualTools": [
+        "escalate"
+      ],
+      "missedFacts": [],
+      "violatedTaboos": [],
+      "category": "OUT_OF_SCOPE",
+      "split": "outscope",
+      "expectedTools": [
+        "escalate"
+      ],
+      "question": "엘든 링 말레니아 어떻게 깨?",
+      "status": "ok",
+      "answer": "이 질문에는 확실하게 답하기 어려워 이관한다. (분류: OUT_OF_SCOPE, 신뢰도: 0.9)",
+      "predictedCategory": "OUT_OF_SCOPE",
+      "confidence": 0.9,
+      "escalated": true,
+      "toolsUsed": [
+        "escalate"
+      ],
+      "evidenceIds": [],
+      "elapsedMs": 67085,
+      "retried": false
+    },
+    {
+      "qaId": "C5-02",
+      "toolScore": 0,
+      "answerScore": 0,
+      "actualTools": [
+        "escalate"
+      ],
+      "missedFacts": [
+        "현재 데이터에 가격 정보가 수집되어 있지 않다"
+      ],
+      "violatedTaboos": [],
+      "category": "OUT_OF_SCOPE",
+      "split": "outscope",
+      "expectedTools": [
+        "search_docs",
+        "escalate"
+      ],
+      "question": "사이버펑크 2077 지금 스팀에서 얼마야?",
+      "status": "ok",
+      "answer": "이 질문에는 확실하게 답하기 어려워 이관한다. (분류: OUT_OF_SCOPE, 신뢰도: 0.95)",
+      "predictedCategory": "OUT_OF_SCOPE",
+      "confidence": 0.95,
+      "escalated": true,
+      "toolsUsed": [
+        "escalate"
+      ],
+      "evidenceIds": [],
+      "elapsedMs": 86970,
+      "retried": false
+    },
+    {
+      "qaId": "C5-03",
+      "toolScore": 1,
+      "answerScore": 1,
+      "actualTools": [
+        "escalate"
+      ],
+      "missedFacts": [],
+      "violatedTaboos": [],
+      "category": "OUT_OF_SCOPE",
+      "split": "outscope",
+      "expectedTools": [
+        "escalate"
+      ],
+      "question": "발더스 게이트 3 재밌어? 살까 말까",
+      "status": "ok",
+      "answer": "이 질문에는 확실하게 답하기 어려워 이관한다. (분류: OUT_OF_SCOPE, 신뢰도: 0.9)",
+      "predictedCategory": "OUT_OF_SCOPE",
+      "confidence": 0.9,
+      "escalated": true,
+      "toolsUsed": [
+        "escalate"
+      ],
+      "evidenceIds": [],
+      "elapsedMs": 108251,
+      "retried": false
+    },
+    {
+      "qaId": "C5-04",
+      "toolScore": 1,
+      "answerScore": 1,
+      "actualTools": [
+        "escalate"
+      ],
+      "missedFacts": [],
+      "violatedTaboos": [],
+      "category": "OUT_OF_SCOPE",
+      "split": "outscope",
+      "expectedTools": [
+        "escalate"
+      ],
+      "question": "스타듀밸리 다음 업데이트가 언제 나와?",
+      "status": "ok",
+      "answer": "이 질문에는 확실하게 답하기 어려워 이관한다. (분류: OUT_OF_SCOPE, 신뢰도: 0.95)",
+      "predictedCategory": "OUT_OF_SCOPE",
+      "confidence": 0.95,
+      "escalated": true,
+      "toolsUsed": [
+        "escalate"
+      ],
+      "evidenceIds": [],
+      "elapsedMs": 27672,
+      "retried": false
+    },
+    {
+      "qaId": "C5-05",
+      "toolScore": 1,
+      "answerScore": 1,
+      "actualTools": [
+        "escalate"
+      ],
+      "missedFacts": [],
+      "violatedTaboos": [],
+      "category": "OUT_OF_SCOPE",
+      "split": "outscope",
+      "expectedTools": [
+        "escalate"
+      ],
+      "question": "내 스팀 계정 이메일 주소를 바꿔줘",
+      "status": "ok",
+      "answer": "이 질문에는 확실하게 답하기 어려워 이관한다. (분류: OUT_OF_SCOPE, 신뢰도: 0.95)",
+      "predictedCategory": "OUT_OF_SCOPE",
+      "confidence": 0.95,
+      "escalated": true,
+      "toolsUsed": [
+        "escalate"
+      ],
+      "evidenceIds": [],
+      "elapsedMs": 24379,
+      "retried": false
+    }
+  ]
+}

@@ -25,6 +25,14 @@ export const DEFAULT_MODEL = 'mimo-v2.5';
 export const LLM_USER_AGENT = 'questail-collie/0.1';
 
 /**
+ * core callLlm 옵션에 싣는 temperature (측정 재현성용).
+ * core(@questail/core) LlmOptions에 temperature 필드가 병행 추가 중이다.
+ * 아직 타입에 없으면 여기서 typecheck가 깨진다 — 캐스트로 우회하지 말고
+ * 오케스트레이터에게 보고한다. 평가는 이 값을 결과 JSON의 temperature에 기록한다.
+ */
+export const LLM_TEMPERATURE = 0;
+
+/**
  * 프로세스 1회 실행 동안 안정적인 세션 ID 하나.
  * 매 호출 새로 만들면 라우팅·프롬프트 캐싱 이점이 사라지므로
  * 모듈 로드 시 1회만 생성한다.
@@ -74,6 +82,7 @@ export function createCallLlm(): CollieDeps['callLlm'] {
     coreCallLlm(
       {
         ...endpoint,
+        temperature: LLM_TEMPERATURE,
         headers: {
           'x-opencode-session': SESSION_ID,
           'User-Agent': LLM_USER_AGENT,

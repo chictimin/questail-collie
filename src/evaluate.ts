@@ -3,8 +3,9 @@
  *
  * 문항 설계는 오케스트레이터 몫이다. 이 파일은 문항을 지어내지 않는다.
  * 입력: data/eval_set.csv (EvalItem 컬럼) + data/answer_gold.json (AnswerGold[])
- * 실행: pnpm eval [--eval PATH] [--gold PATH] [--only C1,C2] [--limit N] | pnpm eval --self-test
+ * 실행: pnpm eval [--eval PATH] [--gold PATH] [--only C1,C2] [--limit N] [--concurrency N] [--run-label STR] | pnpm eval --self-test
  * --only는 qaId 완전일치 또는 접두사 일치(쉼표 구분), --limit은 앞 N문항만 실행한다.
+ * --concurrency는 동시 실행 상한 (기본값 2), --run-label은 결과 JSON의 runLabel이 된다.
  *
  * 의존성 주입(CollieDeps)은 src/context.ts의 `getDeps()`를 쓴다.
  * --self-test는 context/data 없이 돌아간다 (채점기 자체 검증용).
@@ -16,7 +17,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { fileURLToPath } from 'node:url';
 import { extractJsonPayload } from '@questail/core';
 import { runCollie } from './graph.js';
-import { createCallLlm } from './llm.js';
+import { createCallLlm, LLM_TEMPERATURE } from './llm.js';
 import {
   CATEGORIES,
   type AnswerGold,
@@ -382,29 +383,30 @@ function formatEta(totalSeconds: number): string {
 }
 
 /**
- * 문항별 진행률 한 줄.
+ * 문항별 진행률 한 줄 (병렬 실행용 — 완료 건수 기준).
  * 예: [eval] (3/27) C4-02: tool=1 answer=0 (46.1s) | 누적 tool 0.67 answer 0.33 | 경과 2m18s · 잔여 ~11m
- * 누적은 지금까지 status=ok인 행만의 평균 (0건이면 "누적 -").
- * 잔여는 남은 건수 × 지금까지 ok/error 포함 전체 평균 소요시간으로 추정한다.
+ * done은 지금까지 완료된 행(완료 순서), doneCount는 완료 건수다.
+ * 누적은 done 중 status=ok인 행만의 평균 (0건이면 "누적 -").
+ * 잔여는 남은 건수 × done 전체 평균 소요시간으로 추정한다.
  */
 function formatProgress(
-  rows: ExtendedRow[],
-  qaId: string,
-  loopStart: number,
+  done: ExtendedRow[],
+  doneCount: number,
   total: number,
+  loopStart: number,
+  qaId: string,
   score: string,
   elapsedMs: number,
 ): string {
-  const n = rows.length;
-  const ok = rows.filter((r) => r.status === 'ok');
+  const ok = done.filter((r) => r.status === 'ok');
   const cumulative =
     ok.length === 0
       ? '누적 -'
       : `누적 tool ${mean(ok, 'toolScore').toFixed(2)} answer ${mean(ok, 'answerScore').toFixed(2)}`;
   const elapsedSec = (Date.now() - loopStart) / 1000;
-  const avgMs = rows.reduce((sum, r) => sum + r.elapsedMs, 0) / rows.length;
-  const remainSec = ((total - n) * avgMs) / 1000;
-  return `[eval] (${n}/${total}) ${qaId}: ${score} (${(elapsedMs / 1000).toFixed(1)}s) | ${cumulative} | 경과 ${formatDur(elapsedSec)} · 잔여 ${formatEta(remainSec)}`;
+  const avgMs = done.length === 0 ? 0 : done.reduce((sum, r) => sum + r.elapsedMs, 0) / done.length;
+  const remainSec = ((total - doneCount) * avgMs) / 1000;
+  return `[eval] (${doneCount}/${total}) ${qaId}: ${score} (${(elapsedMs / 1000).toFixed(1)}s) | ${cumulative} | 경과 ${formatDur(elapsedSec)} · 잔여 ${formatEta(remainSec)}`;
 }
 
 function printReport(rows: ExtendedRow[], fewshotSkipped: number): void {
@@ -456,7 +458,131 @@ export function repoRelative(p: string): string {
   return p;
 }
 
-async function runEval(evalPath: string, goldPath: string, onlyTokens: string[], limit: number | undefined): Promise<void> {  const items = await loadEvalSet(evalPath);
+/**
+ * 문항 1건 실행 → ExtendedRow 1행. 실패는 throw하지 않고 status=error 행으로 돌린다
+ * (0점으로 삼키지 않고 평균에서 제외한다). allSettled 수집의 rejected 분기는
+ * 행 구성 코드 자체의 결함 같은 예외적 상황용 폴백이다.
+ */
+async function runOne(
+  item: EvalItem,
+  g: AnswerGold,
+  deps: CollieDeps,
+  callLlm: CollieDeps['callLlm'],
+): Promise<ExtendedRow> {
+  const t0 = Date.now();
+  try {
+    const res = await runCollie(item.question, deps);
+    const toolScore = toolScoreFor(res.toolsUsed, item.expectedTools);
+    const judged = await scoreWithJudge(callLlm, item.question, res.answer, g.mustInclude, g.mustNotSay);
+    const elapsedMs = Date.now() - t0;
+    return {
+      qaId: item.qaId,
+      toolScore,
+      answerScore: judged.answerScore,
+      actualTools: res.toolsUsed,
+      missedFacts: judged.missedFacts,
+      violatedTaboos: judged.violatedTaboos,
+      category: item.category,
+      split: item.split,
+      expectedTools: item.expectedTools,
+      question: item.question,
+      status: 'ok',
+      answer: res.answer,
+      predictedCategory: res.category,
+      confidence: res.confidence,
+      escalated: res.escalated,
+      toolsUsed: res.toolsUsed,
+      evidenceIds: res.evidenceIds,
+      elapsedMs,
+      retried: judged.retried,
+    };
+  } catch (err) {
+    const elapsedMs = Date.now() - t0;
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      qaId: item.qaId,
+      toolScore: 0,
+      answerScore: 0,
+      actualTools: [],
+      missedFacts: [],
+      violatedTaboos: [],
+      category: item.category,
+      split: item.split,
+      expectedTools: item.expectedTools,
+      question: item.question,
+      status: 'error',
+      error: msg,
+      answer: '',
+      predictedCategory: item.category,
+      confidence: 0,
+      escalated: false,
+      toolsUsed: [],
+      evidenceIds: [],
+      elapsedMs,
+      retried: err instanceof JudgeFailedError ? err.retried : false,
+    };
+  }
+}
+
+/** 행 구성 코드 자체가 throw한 경우의 폴백 error 행 (정상 경로에서는 쓰이지 않는다). */
+function fallbackErrorRow(item: EvalItem, reason: unknown): ExtendedRow {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  return {
+    qaId: item.qaId,
+    toolScore: 0,
+    answerScore: 0,
+    actualTools: [],
+    missedFacts: [],
+    violatedTaboos: [],
+    category: item.category,
+    split: item.split,
+    expectedTools: item.expectedTools,
+    question: item.question,
+    status: 'error',
+    error: `[harness] ${msg}`,
+    answer: '',
+    predictedCategory: item.category,
+    confidence: 0,
+    escalated: false,
+    toolsUsed: [],
+    evidenceIds: [],
+    elapsedMs: 0,
+    retried: false,
+  };
+}
+
+/**
+ * 외부 의존성 없는 동시성 제한기. tasks를 최대 limit개씩 동시에 돌리고
+ * Promise.allSettled 기반으로 수집한다. 한 문항의 실패가 나머지를 멈추지 않는다.
+ * 결과는 입력 순서대로 반환한다 (호출부가 qaId 정렬로 확정 순서를 만든다).
+ */
+async function runWithLimit<T>(tasks: Array<() => Promise<T>>, limit: number): Promise<Array<PromiseSettledResult<T>>> {
+  const results: Array<PromiseSettledResult<T>> = new Array(tasks.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < tasks.length) {
+      const i = next++;
+      try {
+        results[i] = { status: 'fulfilled', value: await tasks[i]() };
+      } catch (reason) {
+        results[i] = { status: 'rejected', reason };
+      }
+    }
+  };
+  const pool = Array.from({ length: Math.max(1, Math.min(limit, tasks.length)) }, () => worker());
+  await Promise.allSettled(pool);
+  return results;
+}
+
+async function runEval(
+  evalPath: string,
+  goldPath: string,
+  onlyTokens: string[],
+  limit: number | undefined,
+  concurrency: number,
+  runLabel: string,
+): Promise<void> {
+  const items = await loadEvalSet(evalPath);
   const gold = await loadGold(goldPath);
   let targets = items.filter((i) => i.split !== 'fewshot');
   const fewshotSkipped = items.length - targets.length;
@@ -478,67 +604,28 @@ async function runEval(evalPath: string, goldPath: string, onlyTokens: string[],
   const deps: CollieDeps = await getDeps();
   const callLlm = deps.callLlm;
   const rows: ExtendedRow[] = [];
+  // 진행률 누적용 (완료 순서 — 평균·ETA 계산에만 쓰고 출력 순서는 아래 정렬이 정한다).
+  const done: ExtendedRow[] = [];
+  let doneCount = 0;
   const loopStart = Date.now();
-  for (const item of targets) {
+  const tasks = targets.map((item) => {
     const g = gold.get(item.qaId) as AnswerGold;
-    const t0 = Date.now();
-    try {
-      const res = await runCollie(item.question, deps);
-      const toolScore = toolScoreFor(res.toolsUsed, item.expectedTools);
-      const judged = await scoreWithJudge(callLlm, item.question, res.answer, g.mustInclude, g.mustNotSay);
-      const elapsedMs = Date.now() - t0;
-      rows.push({
-        qaId: item.qaId,
-        toolScore,
-        answerScore: judged.answerScore,
-        actualTools: res.toolsUsed,
-        missedFacts: judged.missedFacts,
-        violatedTaboos: judged.violatedTaboos,
-        category: item.category,
-        split: item.split,
-        expectedTools: item.expectedTools,
-        question: item.question,
-        status: 'ok',
-        answer: res.answer,
-        predictedCategory: res.category,
-        confidence: res.confidence,
-        escalated: res.escalated,
-        toolsUsed: res.toolsUsed,
-        evidenceIds: res.evidenceIds,
-        elapsedMs,
-        retried: judged.retried,
-      });
-      console.log(
-        formatProgress(rows, item.qaId, loopStart, targets.length, `tool=${toolScore} answer=${judged.answerScore}`, elapsedMs),
-      );
-    } catch (err) {
-      const elapsedMs = Date.now() - t0;
-      const msg = err instanceof Error ? err.message : String(err);
-      rows.push({
-        qaId: item.qaId,
-        toolScore: 0,
-        answerScore: 0,
-        actualTools: [],
-        missedFacts: [],
-        violatedTaboos: [],
-        category: item.category,
-        split: item.split,
-        expectedTools: item.expectedTools,
-        question: item.question,
-        status: 'error',
-        error: msg,
-        answer: '',
-        predictedCategory: item.category,
-        confidence: 0,
-        escalated: false,
-        toolsUsed: [],
-        evidenceIds: [],
-        elapsedMs,
-        retried: err instanceof JudgeFailedError ? err.retried : false,
-      });
-      console.log(formatProgress(rows, item.qaId, loopStart, targets.length, `ERROR ${msg}`, elapsedMs));
-    }
-  }
+    return async (): Promise<ExtendedRow> => {
+      const row = await runOne(item, g, deps, callLlm);
+      doneCount++;
+      done.push(row);
+      const score =
+        row.status === 'ok' ? `tool=${row.toolScore} answer=${row.answerScore}` : `ERROR ${row.error}`;
+      console.log(formatProgress(done, doneCount, targets.length, loopStart, item.qaId, score, row.elapsedMs));
+      return row;
+    };
+  });
+  const settled = await runWithLimit(tasks, concurrency);
+  settled.forEach((s, i) => {
+    rows.push(s.status === 'fulfilled' ? s.value : fallbackErrorRow(targets[i], s.reason));
+  });
+  // 병렬 완료 순서는 실행마다 달라진다. 회차 간 비교를 위해 qaId 오름차순으로 고정한다.
+  rows.sort((a, b) => (a.qaId < b.qaId ? -1 : a.qaId > b.qaId ? 1 : 0));
   printReport(rows, fewshotSkipped);
   const ok = rows.filter((r) => r.status === 'ok');
   const errorCount = rows.length - ok.length;
@@ -559,6 +646,9 @@ async function runEval(evalPath: string, goldPath: string, onlyTokens: string[],
         timestamp: ts,
         evalFile: repoRelative(evalPath),
         goldFile: repoRelative(goldPath),
+        runLabel,
+        concurrency,
+        temperature: LLM_TEMPERATURE,
         totals: {
           attempted: rows.length,
           scored: ok.length,
@@ -601,11 +691,21 @@ try {
       limit = Number(limitRaw);
       if (!Number.isInteger(limit) || limit <= 0) throw new Error(`[eval] --limit 값 오류 "${limitRaw}" (1 이상 정수)`);
     }
+    const concurrencyRaw = flagValue(argv, '--concurrency');
+    let concurrency = 2;
+    if (concurrencyRaw !== undefined) {
+      concurrency = Number(concurrencyRaw);
+      if (!Number.isInteger(concurrency) || concurrency <= 0)
+        throw new Error(`[eval] --concurrency 값 오류 "${concurrencyRaw}" (1 이상 정수)`);
+    }
+    const runLabel = flagValue(argv, '--run-label') ?? '';
     await runEval(
       resolve(flagValue(argv, '--eval') ?? join('data', 'eval_set.csv')),
       resolve(flagValue(argv, '--gold') ?? join('data', 'answer_gold.json')),
       onlyTokens,
       limit,
+      concurrency,
+      runLabel,
     );
   }
 } catch (err) {

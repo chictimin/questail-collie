@@ -236,7 +236,7 @@ packages:
         optional: true
 
   '@questail/core@file:vendor/questail-core-0.2.0.tgz':
-    resolution: {integrity: sha512-+dMi3GWfLEV1CYP8eV6uL7QiRzrrYhBeQ1o35m3qnzGiI+OlNsXKr6LvNmPXUhoVzR0nW5k7dOMPM94I7NAL5w==, tarball: file:vendor/questail-core-0.2.0.tgz}
+    resolution: {integrity: sha512-nLh1zuNNMtMAEOs+xjRA1JGtS9vp8Tdx4i1r8QZRKEsnYkBrsASTw3eE+sMxeFKad8QRv7LiSFGGeQFafdUrOA==, tarball: file:vendor/questail-core-0.2.0.tgz}
     version: 0.2.0
     hasBin: true
 
