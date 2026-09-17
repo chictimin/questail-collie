@@ -13,7 +13,7 @@ C4-01,DATA_OPS,eval,장르 정보가 비어 있는 게임이 있어?,lookup_libr
 C4-02,DATA_OPS,eval,이 데이터 마지막으로 갱신된 게 언제야?,lookup_library,합성
 C4-03,DATA_OPS,fewshot,별점은 자동으로 매겨지는 거야 내가 넣는 거야?,search_docs,합성
 C5-01,OUT_OF_SCOPE,outscope,엘든 링 말레니아 어떻게 깨?,escalate,합성
-C5-02,OUT_OF_SCOPE,outscope,사이버펑크 2077 지금 스팀에서 얼마야?,escalate,합성
+C5-02,OUT_OF_SCOPE,outscope,사이버펑크 2077 지금 스팀에서 얼마야?,search_docs|escalate,합성
 C5-03,OUT_OF_SCOPE,outscope,발더스 게이트 3 재밌어? 살까 말까,escalate,합성
 C1-05,HISTORY,eval,스타듀밸리 총 플레이타임이 몇 분이야?,lookup_library,합성
 C1-06,HISTORY,eval,시드 마이어 문명 6 업적 달성률이 몇 %야?,lookup_library|search_docs,합성

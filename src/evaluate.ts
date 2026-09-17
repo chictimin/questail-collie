@@ -3,7 +3,8 @@
  *
  * 문항 설계는 오케스트레이터 몫이다. 이 파일은 문항을 지어내지 않는다.
  * 입력: data/eval_set.csv (EvalItem 컬럼) + data/answer_gold.json (AnswerGold[])
- * 실행: pnpm eval [--eval PATH] [--gold PATH] | pnpm eval --self-test
+ * 실행: pnpm eval [--eval PATH] [--gold PATH] [--only C1,C2] [--limit N] | pnpm eval --self-test
+ * --only는 qaId 완전일치 또는 접두사 일치(쉼표 구분), --limit은 앞 N문항만 실행한다.
  *
  * 의존성 주입(CollieDeps)은 src/context.ts의 `getDeps()`를 쓴다.
  * --self-test는 context/data 없이 돌아간다 (채점기 자체 검증용).
@@ -191,22 +192,38 @@ export interface JudgeResult {
   answerScore: 0 | 1;
   missedFacts: string[];
   violatedTaboos: string[];
+  /** 파싱 실패로 재시도한 호출이었는가 */
+  retried: boolean;
 }
 
-async function judgeOnce(
-  callLlm: CollieDeps['callLlm'],
-  question: string,
-  answer: string,
-  mustInclude: string[],
-  mustNotSay: string[],
-): Promise<{ included: boolean[]; violated: boolean[] }> {
-  const prompt = [
+/** scoreWithJudge가 던지는 실패. 재시도 시도 여부를 함께 전달한다. */
+export class JudgeFailedError extends Error {
+  retried: boolean;
+  constructor(message: string, retried: boolean) {
+    super(message);
+    this.name = 'JudgeFailedError';
+    this.retried = retried;
+  }
+}
+
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function buildJudgePrompt(question: string, answer: string, mustInclude: string[], mustNotSay: string[]): string {
+  return [
     `질문: ${question}`,
     `답변: ${answer}`,
     `반드시 포함해야 할 사실:\n${mustInclude.map((f, i) => `${i + 1}. ${f}`).join('\n') || '(없음)'}`,
     `금칙:\n${mustNotSay.map((f, i) => `${i + 1}. ${f}`).join('\n') || '(없음)'}`,
   ].join('\n\n');
-  const raw = await callLlm(prompt, JUDGE_SYSTEM);
+}
+
+function parseJudgeResponse(
+  raw: string,
+  mustInclude: string[],
+  mustNotSay: string[],
+): { included: boolean[]; violated: boolean[] } {
   const parsed: unknown = JSON.parse(extractJsonPayload(raw));
   if (typeof parsed !== 'object' || parsed === null) throw new Error('채점 JSON 아님');
   const rec = parsed as Record<string, unknown>;
@@ -222,7 +239,26 @@ async function judgeOnce(
   };
 }
 
-/** LLM 판정. 파싱 실패 시 1회 재시도 후에도 안 되면 0점 + 사유 기록하고 계속한다. */
+function toJudgeResult(
+  mustInclude: string[],
+  mustNotSay: string[],
+  included: boolean[],
+  violated: boolean[],
+  retried: boolean,
+): JudgeResult {
+  const missedFacts = mustInclude.filter((_, i) => !included[i]);
+  const violatedTaboos = mustNotSay.filter((_, i) => violated[i]);
+  const answerScore: 0 | 1 = missedFacts.length === 0 && violatedTaboos.length === 0 ? 1 : 0;
+  return { answerScore, missedFacts, violatedTaboos, retried };
+}
+
+/**
+ * LLM 판정 — 문항당 기본 1회 호출. mustInclude 전부와 mustNotSay 전부를
+ * 한 프롬프트에 넣고 항목별 boolean 배열을 JSON 하나로 받는다.
+ * 재시도는 JSON 파싱 실패(코드펜스·reasoning 잔재 등)에만 정확히 1회 허용하고,
+ * 호출 실패·타임아웃에는 적용하지 않는다. 재시도 후에도 실패하면 throw하고,
+ * 호출부(runEval)가 그 문항을 error 행으로 기록한다 (0점으로 삼키지 않는다).
+ */
 export async function scoreWithJudge(
   callLlm: CollieDeps['callLlm'],
   question: string,
@@ -230,19 +266,32 @@ export async function scoreWithJudge(
   mustInclude: string[],
   mustNotSay: string[],
 ): Promise<JudgeResult> {
-  let lastErr = '';
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const { included, violated } = await judgeOnce(callLlm, question, answer, mustInclude, mustNotSay);
-      const missedFacts = mustInclude.filter((_, i) => !included[i]);
-      const violatedTaboos = mustNotSay.filter((_, i) => violated[i]);
-      const answerScore: 0 | 1 = missedFacts.length === 0 && violatedTaboos.length === 0 ? 1 : 0;
-      return { answerScore, missedFacts, violatedTaboos };
-    } catch (err) {
-      lastErr = err instanceof Error ? err.message : String(err);
-    }
+  const prompt = buildJudgePrompt(question, answer, mustInclude, mustNotSay);
+  // 호출 실패·타임아웃은 재시도 없이 그대로 실패로 올린다.
+  let raw: string;
+  try {
+    raw = await callLlm(prompt, JUDGE_SYSTEM);
+  } catch (err) {
+    throw new JudgeFailedError(errMsg(err), false);
   }
-  return { answerScore: 0, missedFacts: [`채점 응답 파싱 실패: ${lastErr}`], violatedTaboos: [] };
+  try {
+    const { included, violated } = parseJudgeResponse(raw, mustInclude, mustNotSay);
+    return toJudgeResult(mustInclude, mustNotSay, included, violated, false);
+  } catch {
+    /* 파싱 실패만 1회 재시도한다 */
+  }
+  let retryRaw: string;
+  try {
+    retryRaw = await callLlm(prompt, JUDGE_SYSTEM);
+  } catch (err) {
+    throw new JudgeFailedError(errMsg(err), true);
+  }
+  try {
+    const { included, violated } = parseJudgeResponse(retryRaw, mustInclude, mustNotSay);
+    return toJudgeResult(mustInclude, mustNotSay, included, violated, true);
+  } catch (err) {
+    throw new JudgeFailedError(errMsg(err), true);
+  }
 }
 
 // ── 셀프테스트 (채점기 테스트용 fixtures — 평가셋 문항이 아니다) ────────────
@@ -287,6 +336,24 @@ export interface ExtendedRow extends ScoreRow {
   split: EvalSplit;
   expectedTools: ToolName[];
   question: string;
+  /** ok=정상 채점, error=LLM 호출 실패·타임아웃·파싱 실패 (평균에서 제외) */
+  status: 'ok' | 'error';
+  /** status가 error일 때 실패 사유 */
+  error?: string;
+  // ── 오답 분석용 (runCollie 결과 그대로) ──
+  /** 답변 본문 전문 */
+  answer: string;
+  predictedCategory: QueryCategory;
+  confidence: number;
+  escalated: boolean;
+  /** 실제 호출한 도구 집합 */
+  toolsUsed: ToolName[];
+  /** 근거로 쓴 청크 id */
+  evidenceIds: string[];
+  /** 문항별 소요 시간 (runCollie + 채점, ms) */
+  elapsedMs: number;
+  /** 채점 파싱 실패로 재시도한 문항인가 */
+  retried: boolean;
 }
 
 function mean(rows: ExtendedRow[], key: 'toolScore' | 'answerScore'): number {
@@ -299,33 +366,51 @@ function pad(s: string, n: number): string {
 }
 
 function printReport(rows: ExtendedRow[], fewshotSkipped: number): void {
-  const cats = [...new Set(rows.map((r) => r.category))].sort();
-  console.log(`[eval] ${rows.length}건 채점 (fewshot ${fewshotSkipped}건 제외)`);
-  console.log('=== 집계 ===');
+  const ok = rows.filter((r) => r.status === 'ok');
+  const errors = rows.filter((r) => r.status === 'error');
+  const errRate = rows.length === 0 ? 0 : (errors.length / rows.length) * 100;
+  console.log(`[eval] ${rows.length}건 시도 (fewshot ${fewshotSkipped}건 제외)`);
+  console.log(`[eval] 에러 ${errors.length}/${rows.length}건 (${errRate.toFixed(1)}%) — 평균에서 제외`);
+  const cats = [...new Set(ok.map((r) => r.category))].sort();
+  console.log('=== 집계 (에러 제외) ===');
   console.log(`${pad('category', 12)}${pad('n', 5)}${pad('tool', 8)}answer`);
   for (const c of cats) {
-    const sub = rows.filter((r) => r.category === c);
+    const sub = ok.filter((r) => r.category === c);
     console.log(`${pad(c, 12)}${pad(String(sub.length), 5)}${pad(mean(sub, 'toolScore').toFixed(2), 8)}${mean(sub, 'answerScore').toFixed(2)}`);
   }
-  console.log(`${pad('ALL', 12)}${pad(String(rows.length), 5)}${pad(mean(rows, 'toolScore').toFixed(2), 8)}${mean(rows, 'answerScore').toFixed(2)}`);
-  const wrong = rows.filter((r) => r.toolScore === 0 || r.answerScore === 0);
+  console.log(`${pad('ALL', 12)}${pad(String(ok.length), 5)}${pad(mean(ok, 'toolScore').toFixed(2), 8)}${mean(ok, 'answerScore').toFixed(2)}`);
+  console.log(`[eval] 평균은 에러 제외 ${ok.length}건 기준 (에러 ${errors.length}건 제외, 0점으로 세지 않음)`);
+  const wrong = rows.filter((r) => r.status === 'error' || r.toolScore === 0 || r.answerScore === 0);
   console.log('=== 틀린 문항 ===');
   if (wrong.length === 0) {
     console.log('(없음)');
     return;
   }
   for (const r of wrong) {
+    if (r.status === 'error') {
+      console.log(`- ${r.qaId} [${r.category}/${r.split}] ERROR: ${r.error} (${(r.elapsedMs / 1000).toFixed(1)}s)`);
+      continue;
+    }
     console.log(`- ${r.qaId} [${r.category}/${r.split}] tool=${r.toolScore} (기대 ${r.expectedTools.join('+') || '(없음)'} vs 실제 ${r.actualTools.join('+') || '(없음)'}) answer=${r.answerScore}`);
     for (const f of r.missedFacts) console.log(`    빠뜨린 사실: ${f}`);
     for (const t of r.violatedTaboos) console.log(`    어긴 금칙: ${t}`);
   }
 }
 
-async function runEval(evalPath: string, goldPath: string): Promise<void> {
+async function runEval(evalPath: string, goldPath: string, onlyTokens: string[], limit: number | undefined): Promise<void> {
   const items = await loadEvalSet(evalPath);
   const gold = await loadGold(goldPath);
-  const targets = items.filter((i) => i.split !== 'fewshot');
+  let targets = items.filter((i) => i.split !== 'fewshot');
   const fewshotSkipped = items.length - targets.length;
+  if (onlyTokens.length > 0) {
+    targets = targets.filter((t) => onlyTokens.some((tok) => t.qaId === tok || t.qaId.startsWith(tok)));
+  }
+  if (limit !== undefined) {
+    targets = targets.slice(0, limit);
+  }
+  if (targets.length === 0) {
+    throw new Error('[eval] 대상 문항이 0건이다 (--only/--limit 조건 확인)');
+  }
   const missingGold = targets.filter((t) => !gold.has(t.qaId));
   if (missingGold.length > 0) {
     throw new Error(`[eval] 정답지 누락: ${missingGold.map((t) => t.qaId).join(', ')}`);
@@ -337,31 +422,73 @@ async function runEval(evalPath: string, goldPath: string): Promise<void> {
   const rows: ExtendedRow[] = [];
   for (const item of targets) {
     const g = gold.get(item.qaId) as AnswerGold;
-    const res = await runCollie(item.question, deps);
-    const toolScore = toolScoreFor(res.toolsUsed, item.expectedTools);
-    const judged = await scoreWithJudge(callLlm, item.question, res.answer, g.mustInclude, g.mustNotSay);
-    rows.push({
-      qaId: item.qaId,
-      toolScore,
-      answerScore: judged.answerScore,
-      actualTools: res.toolsUsed,
-      missedFacts: judged.missedFacts,
-      violatedTaboos: judged.violatedTaboos,
-      category: item.category,
-      split: item.split,
-      expectedTools: item.expectedTools,
-      question: item.question,
-    });
-    console.log(`[eval] ${item.qaId}: tool=${toolScore} answer=${judged.answerScore}`);
+    const t0 = Date.now();
+    try {
+      const res = await runCollie(item.question, deps);
+      const toolScore = toolScoreFor(res.toolsUsed, item.expectedTools);
+      const judged = await scoreWithJudge(callLlm, item.question, res.answer, g.mustInclude, g.mustNotSay);
+      const elapsedMs = Date.now() - t0;
+      rows.push({
+        qaId: item.qaId,
+        toolScore,
+        answerScore: judged.answerScore,
+        actualTools: res.toolsUsed,
+        missedFacts: judged.missedFacts,
+        violatedTaboos: judged.violatedTaboos,
+        category: item.category,
+        split: item.split,
+        expectedTools: item.expectedTools,
+        question: item.question,
+        status: 'ok',
+        answer: res.answer,
+        predictedCategory: res.category,
+        confidence: res.confidence,
+        escalated: res.escalated,
+        toolsUsed: res.toolsUsed,
+        evidenceIds: res.evidenceIds,
+        elapsedMs,
+        retried: judged.retried,
+      });
+      console.log(`[eval] ${item.qaId}: tool=${toolScore} answer=${judged.answerScore} (${(elapsedMs / 1000).toFixed(1)}s)`);
+    } catch (err) {
+      const elapsedMs = Date.now() - t0;
+      const msg = err instanceof Error ? err.message : String(err);
+      rows.push({
+        qaId: item.qaId,
+        toolScore: 0,
+        answerScore: 0,
+        actualTools: [],
+        missedFacts: [],
+        violatedTaboos: [],
+        category: item.category,
+        split: item.split,
+        expectedTools: item.expectedTools,
+        question: item.question,
+        status: 'error',
+        error: msg,
+        answer: '',
+        predictedCategory: item.category,
+        confidence: 0,
+        escalated: false,
+        toolsUsed: [],
+        evidenceIds: [],
+        elapsedMs,
+        retried: err instanceof JudgeFailedError ? err.retried : false,
+      });
+      console.log(`[eval] ${item.qaId}: ERROR ${msg} (${(elapsedMs / 1000).toFixed(1)}s)`);
+    }
   }
   printReport(rows, fewshotSkipped);
+  const ok = rows.filter((r) => r.status === 'ok');
+  const errorCount = rows.length - ok.length;
+  const errorRate = errorCount / rows.length;
   const ts = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '');
   const outDir = resolve('data', 'results');
   await mkdir(outDir, { recursive: true });
   const outPath = join(outDir, `${ts}.json`);
   const byCategory: Record<string, { n: number; tool: number; answer: number }> = {};
-  for (const c of new Set(rows.map((r) => r.category))) {
-    const sub = rows.filter((r) => r.category === c);
+  for (const c of new Set(ok.map((r) => r.category))) {
+    const sub = ok.filter((r) => r.category === c);
     byCategory[c] = { n: sub.length, tool: mean(sub, 'toolScore'), answer: mean(sub, 'answerScore') };
   }
   await writeFile(
@@ -371,7 +498,15 @@ async function runEval(evalPath: string, goldPath: string): Promise<void> {
         timestamp: ts,
         evalFile: evalPath,
         goldFile: goldPath,
-        totals: { n: rows.length, tool: mean(rows, 'toolScore'), answer: mean(rows, 'answerScore') },
+        totals: {
+          attempted: rows.length,
+          scored: ok.length,
+          errors: errorCount,
+          errorRate,
+          meanExcludesErrors: true,
+          tool: mean(ok, 'toolScore'),
+          answer: mean(ok, 'answerScore'),
+        },
         byCategory,
         rows,
       },
@@ -380,6 +515,10 @@ async function runEval(evalPath: string, goldPath: string): Promise<void> {
     ),
   );
   console.log(`[eval] 결과 저장: ${outPath}`);
+  if (errorRate > 0.2) {
+    console.log(`[eval] 에러율 ${(errorRate * 100).toFixed(1)}%가 20%를 초과 — 이 실행은 측정으로 쓸 수 없다 (exit 1)`);
+    process.exitCode = 1;
+  }
 }
 
 function flagValue(args: string[], name: string): string | undefined {
@@ -393,9 +532,19 @@ try {
     const fails = await selfTest();
     process.exitCode = fails === 0 ? 0 : 1;
   } else {
+    const onlyRaw = flagValue(argv, '--only');
+    const onlyTokens = onlyRaw === undefined ? [] : onlyRaw.split(',').map((s) => s.trim()).filter((s) => s !== '');
+    const limitRaw = flagValue(argv, '--limit');
+    let limit: number | undefined;
+    if (limitRaw !== undefined) {
+      limit = Number(limitRaw);
+      if (!Number.isInteger(limit) || limit <= 0) throw new Error(`[eval] --limit 값 오류 "${limitRaw}" (1 이상 정수)`);
+    }
     await runEval(
       resolve(flagValue(argv, '--eval') ?? join('data', 'eval_set.csv')),
       resolve(flagValue(argv, '--gold') ?? join('data', 'answer_gold.json')),
+      onlyTokens,
+      limit,
     );
   }
 } catch (err) {
