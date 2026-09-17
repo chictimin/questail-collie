@@ -7,71 +7,98 @@
 <style>
   :root { color-scheme: light; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #fafafa; color: #1a1a1a; margin: 0; }
-  main { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
-  h1 { font-size: 20px; margin: 0 0 16px; }
-  form { display: flex; gap: 8px; margin-bottom: 8px; }
-  input[type="text"] { flex: 1; padding: 10px 12px; font-size: 15px; border: 1px solid #999; border-radius: 6px; background: #fff; color: inherit; }
-  button { padding: 10px 18px; font-size: 15px; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #fff; cursor: pointer; }
-  button:disabled { opacity: 0.5; cursor: wait; }
-  #meta { font-size: 13px; color: #555; margin: 12px 0 20px; }
-  section { border: 1px solid #ccc; border-radius: 8px; background: #fff; padding: 14px 16px; margin-bottom: 12px; }
-  section h2 { font-size: 14px; margin: 0 0 8px; color: #555; font-weight: 600; }
-  #answer { white-space: pre-wrap; font-size: 15px; line-height: 1.6; }
-  #tools { margin: 0; padding-left: 20px; font-size: 14px; }
-  #evidence article { border-top: 1px solid #e0e0e0; padding: 8px 0; font-size: 14px; }
-  #evidence article:first-of-type { border-top: none; }
-  #evidence .eid { font-family: monospace; font-size: 12px; color: #555; }
-  #evidence .etext { white-space: pre-wrap; margin: 4px 0 0; line-height: 1.5; }
-  #verify .pass { font-weight: 700; }
-  #verify .pass.ok { color: #0a6b1a; }
-  #verify .pass.fail { color: #a31212; }
-  #verify ul { margin: 8px 0 0; padding-left: 20px; font-size: 14px; }
-  #error { color: #a31212; font-size: 14px; margin-bottom: 12px; }
-  .empty { color: #888; font-size: 14px; }
+  header.top { position: sticky; top: 0; z-index: 10; background: #fafafa; max-width: 720px; margin: 0 auto; padding: 12px 16px 8px; border-bottom: 1px solid #e4e4e4; }
+  h1 { font-size: 18px; margin: 0; }
+  .sub { font-size: 13px; color: #777; margin: 4px 0 0; }
+  .endpoint { font-size: 12px; color: #888; margin: 4px 0 0; font-family: monospace; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px 16px 120px; }
+  #chat { display: flex; flex-direction: column; gap: 14px; }
+  .empty-chat { color: #888; font-size: 14px; text-align: center; padding: 24px 0; }
+  .msg { display: flex; flex-direction: column; max-width: 100%; }
+  .msg.user { align-items: flex-end; }
+  .msg.agent { align-items: flex-start; }
+  .bubble { max-width: 85%; padding: 10px 14px; border-radius: 14px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: break-word; box-sizing: border-box; }
+  .bubble.user { background: #1a1a1a; color: #fff; border-bottom-right-radius: 4px; }
+  .bubble.agent { background: #fff; border: 1px solid #ccc; border-bottom-left-radius: 4px; }
+  .bubble.error { background: #fff; border: 1px solid #a31212; color: #a31212; }
+  .meta { font-size: 12px; color: #777; margin-top: 6px; max-width: 85%; line-height: 1.6; overflow-wrap: break-word; }
+  .meta .ok { color: #0a6b1a; }
+  .meta .bad { color: #a31212; font-weight: 700; }
+  .violations { font-size: 12px; color: #a31212; margin: 4px 0 0; padding-left: 18px; max-width: 85%; }
+  details.evidence { font-size: 13px; color: #333; margin-top: 6px; max-width: 85%; }
+  details.evidence summary { cursor: pointer; color: #555; }
+  details.evidence article { border-top: 1px solid #e0e0e0; padding: 8px 0; }
+  details.evidence .eid { font-family: monospace; font-size: 12px; color: #555; overflow-wrap: break-word; }
+  details.evidence .etext { white-space: pre-wrap; margin: 4px 0 0; line-height: 1.5; overflow-wrap: break-word; }
+  .muted { color: #888; font-size: 13px; }
+  .progress { font-size: 13px; color: #555; max-width: 85%; }
+  .progress ul { margin: 6px 0 0; padding-left: 20px; }
+  .progress .doing { font-weight: 700; color: #1a1a1a; }
+  .progress .stime { color: #888; font-size: 12px; }
+  .progress .path { font-size: 12px; color: #888; margin: 0; }
+  .progress .pelapsed { margin: 0 0 2px; }
+  .progress .hint { color: #888; font-size: 12px; margin: 6px 0 0; }
+  .spin { display: inline-block; width: 11px; height: 11px; margin-right: 6px; border: 2px solid #ccc; border-top-color: #1a1a1a; border-radius: 50%; animation: spin 0.9s linear infinite; vertical-align: -1px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .spin { animation: none; border-top-color: #ccc; }
+  }
+  .done-mark { color: #0a6b1a; font-weight: 700; }
+  #composer { position: fixed; left: 0; right: 0; bottom: 0; background: #fafafa; border-top: 1px solid #ddd; }
+  #composer form { max-width: 720px; margin: 0 auto; padding: 12px 16px; display: flex; gap: 8px; box-sizing: border-box; }
+  #composer input[type="text"] { flex: 1; min-width: 0; padding: 10px 12px; font-size: 15px; border: 1px solid #999; border-radius: 6px; background: #fff; color: inherit; }
+  #composer button { padding: 10px 18px; font-size: 15px; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #fff; cursor: pointer; flex-shrink: 0; }
+  #composer button:disabled { opacity: 0.5; cursor: wait; }
 </style>
 </head>
 <body>
-<main>
+<header class="top">
   <h1>questail-collie 데모</h1>
+  <p class="sub">질문을 보내면 라우팅 과정을 보여주고 근거로 답합니다. 보통 20~40초 걸립니다.</p>
+  <p class="endpoint" id="endpoint" hidden></p>
+</header>
+<main>
+  <div id="chat">
+    <p class="empty-chat" id="empty-note">게임 라이브러리에 대해 물어보세요. 이전 질답이 위에 쌓입니다.</p>
+  </div>
+</main>
+<div id="composer">
   <form id="ask-form">
     <input id="question" type="text" placeholder="게임 라이브러리에 대해 물어보세요" autocomplete="off" />
     <button id="send" type="submit">전송</button>
   </form>
-  <div id="error" hidden></div>
-  <div id="meta" hidden></div>
-
-  <section aria-label="답변">
-    <h2>(1) 답변</h2>
-    <div id="answer" class="empty">질문을 입력하고 전송을 누르세요.</div>
-  </section>
-
-  <section aria-label="호출한 도구">
-    <h2>(2) 호출한 도구</h2>
-    <ul id="tools"><li class="empty">—</li></ul>
-  </section>
-
-  <section aria-label="근거">
-    <h2>(3) 근거로 쓴 문서 부분</h2>
-    <div id="evidence"><p class="empty">—</p></div>
-  </section>
-
-  <section aria-label="검증 결과">
-    <h2>(4) 검증 결과</h2>
-    <div id="verify"><p class="empty">—</p></div>
-  </section>
-</main>
+</div>
 <script>
 (function () {
   "use strict";
   var form = document.getElementById("ask-form");
   var input = document.getElementById("question");
   var sendBtn = document.getElementById("send");
-  var errorBox = document.getElementById("error");
-  var metaBox = document.getElementById("meta");
-  var answerBox = document.getElementById("answer");
-  var toolsBox = document.getElementById("tools");
-  var evidenceBox = document.getElementById("evidence");
-  var verifyBox = document.getElementById("verify");
+  var chatBox = document.getElementById("chat");
+  var emptyNote = document.getElementById("empty-note");
+  var endpointBox = document.getElementById("endpoint");
+
+  // 연결된 API·모델 표시. 실패하면 비워 두고 화면은 정상 동작한다.
+  fetch("/api/meta").then(function (res) {
+    if (!res.ok) throw new Error("meta-unavailable");
+    return res.json();
+  }).then(function (m) {
+    if (!m || typeof m.baseUrl !== "string" || typeof m.model !== "string") return;
+    var shown = m.baseUrl.replace(/^https?:\/\//, "");
+    endpointBox.textContent = shown + " · " + m.model;
+    endpointBox.hidden = false;
+  }).catch(function () { /* 표시 없이 진행 */ });
+
+  var STEP_LABELS = {
+    classify: "카테고리 판정",
+    assemble: "도구 선택과 근거 조립",
+    answer: "근거로 답변 생성",
+    verify: "근거 이탈 검사",
+    regenerate: "검증 실패 — 답변 재생성",
+    escalate: "범위 밖으로 판단 — 이관 처리"
+  };
+
+  var inFlight = false;
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (ch) {
@@ -79,20 +106,155 @@
     });
   }
 
-  function showError(msg) {
-    errorBox.hidden = false;
-    errorBox.textContent = msg;
+  function scrollBottom() {
+    window.scrollTo(0, document.body.scrollHeight);
   }
 
-  form.addEventListener("submit", function (ev) {
-    ev.preventDefault();
-    var q = input.value.trim();
-    if (!q) return;
-    errorBox.hidden = true;
-    sendBtn.disabled = true;
-    answerBox.textContent = "답변 생성 중…";
-    answerBox.classList.remove("empty");
+  // ── 진행 표시 (서버 SSE step 이벤트를 그대로 그린다. 시간 추측 없음) ──
+  var stepLog = [];
+  var progWrapEl = null;
+  var progListEl = null;
+  var progElapsedEl = null;
+  var runStart = 0;
+  var ticker = null;
 
+  function stopTicker() {
+    if (ticker) { clearInterval(ticker); ticker = null; }
+  }
+
+  function renderProgress() {
+    if (!progListEl) return;
+    progListEl.innerHTML = stepLog.map(function (s, i) {
+      var current = i === stepLog.length - 1 && s.end == null;
+      if (current) {
+        return "<li class=\"doing\"><span class=\"spin\" aria-hidden=\"true\"></span>" + esc(s.label) + "</li>";
+      }
+      var secs = s.end == null ? "" : " <span class=\"stime\">" + esc(((s.end - s.start) / 1000).toFixed(1) + "초") + "</span>";
+      return "<li><span class=\"done-mark\" aria-hidden=\"true\">✓</span> " + esc(s.label) + secs + "</li>";
+    }).join("");
+  }
+
+  function recordStep(step) {
+    var now = Date.now();
+    if (stepLog.length) stepLog[stepLog.length - 1].end = now;
+    stepLog.push({ label: STEP_LABELS[step] || String(step), start: now, end: null });
+    renderProgress();
+  }
+
+  // 질문 말풍선 + 빈 에이전트 자리(진행 표시용)를 쌓고 에이전트 자리를 돌려준다.
+  function startRun(q) {
+    if (emptyNote) { emptyNote.remove(); emptyNote = null; }
+    var u = document.createElement("div");
+    u.className = "msg user";
+    var ub = document.createElement("div");
+    ub.className = "bubble user";
+    ub.textContent = q;
+    u.appendChild(ub);
+    chatBox.appendChild(u);
+    var a = document.createElement("div");
+    a.className = "msg agent";
+    a.innerHTML = "<div class=\"progress\"><p class=\"pelapsed\">경과 0초</p>" +
+      "<ul class=\"plist\"></ul><p class=\"hint\">보통 20~40초 걸립니다.</p></div>";
+    chatBox.appendChild(a);
+    stepLog = [];
+    progWrapEl = a.querySelector(".progress");
+    progListEl = a.querySelector(".plist");
+    progElapsedEl = a.querySelector(".pelapsed");
+    runStart = Date.now();
+    stopTicker();
+    ticker = setInterval(function () {
+      if (progElapsedEl) progElapsedEl.textContent = "경과 " + Math.floor((Date.now() - runStart) / 1000) + "초";
+    }, 500);
+    scrollBottom();
+    return a;
+  }
+
+  // 완료되면 진행 표시를 경로 한 줄로 접고 답변 자리를 만든다.
+  function collapseProgress() {
+    var now = Date.now();
+    if (stepLog.length && stepLog[stepLog.length - 1].end == null) {
+      stepLog[stepLog.length - 1].end = now;
+    }
+    stopTicker();
+    var total = ((now - runStart) / 1000).toFixed(1);
+    var summary;
+    if (!stepLog.length) {
+      summary = "<p class=\"path\">진행 기록 없음 · 총 " + total + "초</p>";
+    } else {
+      var parts = stepLog.map(function (s) {
+        var t = s.end == null ? "" : " " + ((s.end - s.start) / 1000).toFixed(1) + "초";
+        return esc(s.label) + t;
+      });
+      summary = "<p class=\"path\">경로: " + parts.join(" → ") + " · 총 " + total + "초</p>";
+    }
+    if (progWrapEl) progWrapEl.innerHTML = summary;
+    progWrapEl = null;
+    progListEl = null;
+    progElapsedEl = null;
+  }
+
+  function appendBubble(agentEl, text, extraClass) {
+    var d = document.createElement("div");
+    d.className = "bubble agent" + (extraClass ? " " + extraClass : "");
+    d.textContent = text;
+    agentEl.appendChild(d);
+  }
+
+  // 답변 말풍선 아래 메타 2줄: 분류·도구·시간 / 검증·이관
+  function metaHtml(r) {
+    var tools = (r.toolsUsed && r.toolsUsed.length) ? r.toolsUsed.join(", ") : "없음";
+    var secs = r.elapsedMs != null ? (r.elapsedMs / 1000).toFixed(1) + "초" : "";
+    var line1 = esc(r.category) + " · conf " + esc(r.confidence) + " · 도구: " + esc(tools) +
+      (secs ? " · " + secs : "");
+    var v = r.verify || {};
+    var n = (v.violations && v.violations.length) || 0;
+    var line2 = (v.passed === true)
+      ? "<span class=\"ok\">검증 통과</span>"
+      : "<span class=\"bad\">검증 위반 " + n + "건</span>";
+    if (r.escalated) line2 += " · <span class=\"bad\">이관됨</span>";
+    return "<div class=\"meta\">" + line1 + "<br>" + line2 + "</div>";
+  }
+
+  function violationsHtml(r) {
+    var vs = (r.verify && r.verify.violations) || [];
+    if (!vs.length) return "";
+    return "<ul class=\"violations\">" + vs.map(function (x) {
+      return "<li><code>" + esc(x.rule) + "</code> — " + esc(x.detail) + "</li>";
+    }).join("") + "</ul>";
+  }
+
+  // 근거는 기본 접힘. 펼치면 id + 텍스트 함께 (대조가 목적이라 둘 다 필요).
+  function evidenceHtml(r) {
+    var evList = r.evidence && r.evidence.length ? r.evidence : null;
+    var inner;
+    if (evList) {
+      inner = evList.map(function (e) {
+        return "<article><div class=\"eid\">" + esc(e.id) + " · " + esc(e.heading || "") + "</div>" +
+          "<p class=\"etext\">" + esc(e.text || "") + "</p></article>";
+      }).join("");
+    } else {
+      var ids = (r.evidenceIds && r.evidenceIds.length) ? r.evidenceIds.join(", ") : "없음";
+      inner = "<p class=\"muted\">텍스트 미수신 — evidenceIds: " + esc(ids) + "</p>";
+    }
+    var n = evList ? evList.length : 0;
+    return "<details class=\"evidence\"><summary>근거 " + n + "건</summary>" + inner + "</details>";
+  }
+
+  function fillMessage(agentEl, r) {
+    collapseProgress();
+    appendBubble(agentEl, r.answer || "(빈 답변)", null);
+    agentEl.insertAdjacentHTML("beforeend", metaHtml(r) + violationsHtml(r) + evidenceHtml(r));
+    scrollBottom();
+  }
+
+  function failMessage(agentEl, msg) {
+    collapseProgress();
+    appendBubble(agentEl, msg, "error");
+    scrollBottom();
+  }
+
+  // ── 기존 경로 (스트리밍 실패 시 폴백) ──
+  function askOnce(q, agentEl) {
     fetch("/api/ask", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -102,57 +264,100 @@
         return { status: res.status, data: data };
       });
     }).then(function (out) {
+      inFlight = false;
       sendBtn.disabled = false;
       if (out.status !== 200) {
-        showError(out.data && out.data.error ? out.data.error : "요청 실패 (HTTP " + out.status + ")");
+        failMessage(agentEl, out.data && out.data.error ? out.data.error : "요청 실패 (HTTP " + out.status + ")");
         return;
       }
-      var r = out.data;
-
-      // 분류 결과 + 이관 여부
-      metaBox.hidden = false;
-      metaBox.textContent = "category: " + r.category + " · confidence: " + r.confidence +
-        " · escalated: " + (r.escalated ? "예" : "아니오");
-
-      // (1) 답변
-      answerBox.textContent = r.answer || "(빈 답변)";
-
-      // (2) 호출한 도구 목록
-      toolsBox.innerHTML = (r.toolsUsed && r.toolsUsed.length)
-        ? r.toolsUsed.map(function (t) { return "<li><code>" + esc(t) + "</code></li>"; }).join("")
-        : "<li>호출한 도구 없음</li>";
-
-      // (3) 근거 문서 부분
-      var evList = r.evidence && r.evidence.length ? r.evidence : null;
-      if (evList) {
-        evidenceBox.innerHTML = evList.map(function (e) {
-          return "<article><div class=\"eid\">" + esc(e.id) + " · " + esc(e.heading || "") + "</div>" +
-            "<p class=\"etext\">" + esc(e.text || "") + "</p></article>";
-        }).join("");
-      } else {
-        var ids = (r.evidenceIds && r.evidenceIds.length) ? r.evidenceIds.join(", ") : "없음";
-        evidenceBox.innerHTML = "<p class=\"empty\">텍스트 미수신 — evidenceIds: " + esc(ids) + "</p>";
-      }
-
-      // (4) 검증 결과
-      var v = r.verify || {};
-      var passed = v.passed === true;
-      var html = "<p class=\"pass " + (passed ? "ok" : "fail") + "\">" +
-        (passed ? "통과" : "실패") + "</p>";
-      if (v.violations && v.violations.length) {
-        html += "<ul>" + v.violations.map(function (x) {
-          return "<li><code>" + esc(x.rule) + "</code> — " + esc(x.detail) + "</li>";
-        }).join("") + "</ul>";
-      } else {
-        html += "<p class=\"empty\">위반 없음</p>";
-      }
-      verifyBox.innerHTML = html;
+      fillMessage(agentEl, out.data);
     }).catch(function (err) {
+      inFlight = false;
       sendBtn.disabled = false;
-      showError("요청 실패: " + err.message);
+      failMessage(agentEl, "요청 실패: " + err.message);
+    });
+  }
+
+  // ── 스트리밍 경로 (POST + SSE 수동 파싱. EventSource는 GET만 되어서 못 쓴다) ──
+  function askStream(q, agentEl) {
+    return fetch("/api/ask/stream", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question: q })
+    }).then(function (res) {
+      var ct = res.headers.get("content-type") || "";
+      if (!res.ok || ct.indexOf("text/event-stream") < 0 || !res.body || !res.body.getReader) {
+        throw new Error("stream-unavailable");
+      }
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+      var buf = "";
+      var settled = false;
+      var result = null;
+      var errMsg = "";
+      var onEvent = function (ev) {
+        if (!ev || typeof ev.type !== "string") return;
+        if (ev.type === "step") {
+          recordStep(ev.step);
+        } else if (ev.type === "done") {
+          settled = true;
+          result = ev.result;
+        } else if (ev.type === "error") {
+          settled = true;
+          errMsg = ev.message || "실행 실패";
+        }
+      };
+      var handleChunk = function (chunk) {
+        var data = [];
+        chunk.split("\n").forEach(function (line) {
+          if (line.slice(0, 5) === "data:") data.push(line.slice(5).trim());
+        });
+        if (!data.length) return;
+        try { onEvent(JSON.parse(data.join("\n"))); } catch (e) { /* 다음 청크에서 계속 */ }
+      };
+      var pump = function () {
+        return reader.read().then(function (rd) {
+          if (rd.done) {
+            buf += decoder.decode();
+            if (buf.trim()) handleChunk(buf);
+            buf = "";
+            if (!settled) throw new Error("stream-cut");
+            return { result: result, errMsg: errMsg };
+          }
+          buf += decoder.decode(rd.value, { stream: true });
+          var parts = buf.split("\n\n");
+          buf = parts.pop();
+          parts.forEach(handleChunk);
+          return pump();
+        });
+      };
+      return pump();
+    }).then(function (out) {
+      inFlight = false;
+      sendBtn.disabled = false;
+      if (out.errMsg) {
+        failMessage(agentEl, out.errMsg);
+        return;
+      }
+      fillMessage(agentEl, out.result);
+    });
+  }
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    if (inFlight) return;
+    var q = input.value.trim();
+    if (!q) return;
+    inFlight = true;
+    sendBtn.disabled = true;
+    var agentEl = startRun(q);
+    input.value = "";
+
+    askStream(q, agentEl).catch(function () {
+      // 스트리밍이 안 되면 기존 경로로 폴백한다 (화면이 아예 안 되는 것보다 낫다).
+      if (progElapsedEl) progElapsedEl.textContent += " — 스트리밍 연결 실패, 일반 요청으로 전환합니다";
+      askOnce(q, agentEl);
     });
   });
 })();
 </script>
-</body>
-</html>
