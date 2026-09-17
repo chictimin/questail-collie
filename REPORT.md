@@ -42,13 +42,15 @@ D-D~D-F는 새로 발명한 규정이 아니라 PRD·TODO에 이미 결정으로
 | D-E#별점-척도 | policy-rating 1. 별점 척도 | SUBJECTIVE |
 | D-E#별점-미입력 | policy-rating 2. 별점 미입력의 취급 | SUBJECTIVE |
 | D-E#상태-분류 | policy-rating 3. 상태 분류 | SUBJECTIVE |
-| D-E#기피-사유 | policy-rating 4. 기피 사유 표기 | SUBJECTIVE |
-| D-E#입력-계층 | policy-rating 5. 입력 계층 | SUBJECTIVE, DATA_OPS |
+| D-E#찜-보유-구분 | policy-rating 4. 찜과 보유의 구분 | SUBJECTIVE, HISTORY, DATA_OPS |
+| D-E#기피-사유 | policy-rating 5. 기피 사유 표기 | SUBJECTIVE |
+| D-E#입력-계층 | policy-rating 6. 입력 계층 | SUBJECTIVE, DATA_OPS |
 | D-F#장르-출처 | glossary-genre 1. 장르 태그 출처 | TASTE |
 | D-F#플레이타임-분배 | glossary-genre 2. 멀티 장르 플레이타임 분배 | TASTE |
 | D-F#정규화 | glossary-genre 3. 정규화 | TASTE |
 | D-F#topgenres-주의 | glossary-genre 4. topGenres 주의 | TASTE |
-| D-F#미반영-신호 | glossary-genre 5. 미반영 신호 | TASTE, SUBJECTIVE |
+| D-F#기피-상위-겹침 | glossary-genre 5. 기피 집계와 상위 장르의 겹침 | TASTE, SUBJECTIVE |
+| D-F#미반영-신호 | glossary-genre 6. 미반영 신호 | TASTE, SUBJECTIVE |
 
 OUT_OF_SCOPE에 연결된 청크가 하나도 없다. 이는 정상이다 — 범위 밖 문의는 근거를 인용하지 않고 이첩하는 것이 정답이므로 근거가 없다.
 
@@ -108,7 +110,83 @@ OUT_OF_SCOPE에 연결된 청크가 하나도 없다. 이는 정상이다 — �
 
 ## (4) 측정 결과
 
-> TODO(측정 후)
+측정 조건: 1차 `data/results/20260917T041200.json`, 2차 `data/results/20260917T045405.json`. 채점 27문항(`fewshot` 3건 제외. JSON split 집계로 확인: eval 22 + outscope 5). 2차 `errors` 0건(JSON 확인). 지표는 (3)절의 2지표 그대로다 — tool은 기대 집합과 정확히 일치해야 1점, answer는 필수 사실 전부 + 금칙어 0건이어야 1점.
+
+### 카테고리별 집계
+
+아래 표는 두 JSON의 `totals`·`byCategory`와 소수 3자리까지 일치함을 확인했다.
+
+| 카테고리 | n | tool 1차 | tool 2차 | Δ | answer 1차 | answer 2차 | Δ |
+|---|---|---|---|---|---|---|---|
+| HISTORY | 6 | 0.333 | 0.333 | +0.000 | 0.333 | 0.167 | -0.167 |
+| TASTE | 6 | 0.333 | 0.333 | +0.000 | 0.333 | 0.333 | +0.000 |
+| SUBJECTIVE | 5 | 0.600 | 0.600 | +0.000 | 0.400 | 0.400 | +0.000 |
+| DATA_OPS | 5 | 0.000 | 0.400 | +0.400 | 0.000 | 0.400 | +0.400 |
+| OUT_OF_SCOPE | 5 | 1.000 | 0.800 | -0.200 | 0.400 | 0.600 | +0.200 |
+| ALL | 27 | 0.444 | 0.481 | +0.037 | 0.296 | 0.370 | +0.074 |
+
+건수로 읽으면 tool 12건→13건(+1), answer 8건→10건(+2)이다(JSON 행 합산으로 검산).
+
+### 개선 사이클
+
+| 사이클 | 무엇을 | 왜 | 기대한 효과 | 실제 효과 | 판정 |
+|---|---|---|---|---|---|
+| 0 (베이스라인, 1차) | 측정만. 변경 없음 | 기준선 확보 | — | tool 0.444 / answer 0.296 | 기준선 |
+| 1a (`70fe287`) | 도구 선택 프롬프트에 "기준·정의·정책·사유·출처를 묻는 질문은 `search_docs` 필수 포함" 규칙 추가 + few-shot 3건 주입 | 1차 오답 분석에서 `search_docs` 미호출이 최대 패턴이었고, 빠뜨린 필수 사실이 전부 docs 조항이었기 때문 | `search_docs` 기대 문항의 tool 상승 | DATA_OPS tool 0.000→0.400. C4-02·C4-06이 정답 도구 집합에 적중. 단 전체 `search_docs` 정합은 C4-06 1건에 그쳤다(기대 15건 중 호출 2건) | 부분 적중 |
+| 1b (`34b110b`) | `search_docs` 조건에서 "갱신 시점"을 "갱신 주기·수집 방식"으로 좁히고, `lookup_library` 조건에 `generated_at` 명시 | 단건 스모크(`20260917T043110`, C4-02 → `search_docs`로 새어 tool 0)에서 규칙 문구가 가르친 그대로 모델이 따른 것이 확인됐기 때문 | C4-02가 `lookup_library`로 복귀 | 단건 스모크(`20260917T043323`, C4-02 → `lookup_library`, tool 1)로 이동 확인. 2차 본측정에서도 C4-02 tool 1 유지. 단 answer는 여전히 0(기준 시각 miss) | 의도대로 동작, 답변 미해결 |
+
+변경 범위는 `src/prompts.ts` 한 파일뿐이다(`git diff --stat 701e4fc..34b110b`로 확인. 두 커밋 모두 이 파일만 건드린다). 타임라인도 맞는다 — 1차(04:12) → `70fe287` → 스모크 실패(04:31) → `34b110b` → 스모크 통과(04:33) → 2차(04:54).
+
+참고: 1차 오답 분석 당시에는 미호출을 11건으로 집계했으나, JSON 재집계로는 12건이다(C1-02·C1-04·C2-01·C2-03·C3-02·C4-01·C1-06·C1-07·C2-04·C2-05·C3-04·C4-04). 1건 차이는 개선 방향에 영향을 주지 않았지만, 수기 집계 대신 JSON 집계를 정본으로 삼아야 한다는 뜻이다.
+
+### 문항 단위 변화 6건
+
+1차 실제 도구와 2차 실제 도구를 나란히 둔다. "실제 도구"는 JSON의 `actualTools`(1차)·`toolsUsed`(2차)에서 가져왔다.
+
+| qaId | 카테고리 | tool | answer | 1차 실제 도구 | 2차 실제 도구 | 판정 |
+|---|---|---|---|---|---|---|
+| C4-02 | DATA_OPS | 0→1 | 0→0 | `search_docs` | `lookup_library` | 실력 (규칙 수정 효과. 단 answer는 기준 시각 miss 지속) |
+| C4-06 | DATA_OPS | 0→1 | 0→1 | `search_docs` | `lookup_library`+`search_docs` | 실력 (규칙 수정 효과) |
+| C4-04 | DATA_OPS | 0→0 | 0→1 | `lookup_library` | `lookup_library` | 잡음 (도구 동일, miss 1건→0건이라 심판 판정만 뒤집힘) |
+| C5-03 | OUT_OF_SCOPE | 1→1 | 0→1 | `escalate` | `escalate` | 잡음 (고정 이관 문구라 답변이 같은데 판정이 뒤집힘. `escalate.ts`에 "고정 문구 — LLM을 거치지 않는다"로 못박혀 있고 2차 답변 원문이 그 문구와 일치. 1차 답변 원문은 1차 JSON에 없어 코드 구조로 뒷받침한다) |
+| C1-07 | HISTORY | 0→0 | 1→0 | `get_taste_profile` | `escalate` | 퇴행 (동일 질문이 2차에서 OUT_OF_SCOPE conf 0.4로 분류돼 이관됨. 임계값 0.6은 `graph.ts` 상수) |
+| C5-02 | OUT_OF_SCOPE | 1→0 | 0→0 | `escalate` | `escalate` | 오염 (동일 동작인데 기대 도구가 측정 사이에 `['escalate']`→`['search_docs','escalate']`로 바뀜. 양쪽 JSON의 `expectedTools`에서 확인) |
+
+### 검산: 기록과 실력의 분리
+
+| | tool | answer |
+|---|---|---|
+| 기록상 순변화 | +1 (12건→13건) | +2 (8건→10건) |
+| 실력 개선 | +2 (C4-02, C4-06) | +1 (C4-06) |
+| 잡음 (심판 뒤집힘) | 0 | +2 (C4-04, C5-03) |
+| 오염 (기대치 변경) | -1 (C5-02) | 0 |
+| 퇴행 (분류 뒤집힘) | 0 | -1 (C1-07) |
+
+합이 맞는다 — tool +2-1=+1, answer +1+2-1=+2. **순수 실력 개선은 2개 문항(C4-02의 tool, C4-06의 tool+answer)뿐**이고 나머지는 잡음·오염·퇴행이다.
+
+### 측정이 흔들린다는 사실 4가지 (이 절의 핵심)
+
+1. **측정 비교가 오염됐다.** C5-02의 기대 도구를 1차 측정 뒤에 `escalate`에서 `search_docs|escalate`로 수정했다. 2차의 tool -1은 성능 저하가 아니라 골대가 움직인 결과다. 1차 JSON의 1차 기대치는 `['escalate']`, 2차는 `['search_docs','escalate']`로 남아 있어 검산 가능하다. 교훈: **평가셋은 측정 사이에 고치면 안 된다.** (덧붙여 C5-02의 miss는 "현재 데이터에 가격 정보가 수집되어 있지 않다"인데, 이는 `policy-collection.md` 제12조(신설)가 바로 그 근거다. 문서는 고쳤고 코드는 그대로다.)
+2. **심판 LLM이 비결정적이다.** C4-04·C5-03은 도구도 답변도 사실상 동일한데 판정만 뒤집혔다. C5-03은 고정 이관 문구라 답변이 같은 것으로 보인다(2차 답변 원문과 코드로 확인했고, 1차 답변 원문은 1차 JSON에 없다는 단서가 붙는다). 답변 지표의 ±1~2문항은 코드와 무관한 흔들림이다.
+3. **분류도 비결정적이다.** C1-07 동일 질문이 1차 `get_taste_profile` 경로에서 2차 `OUT_OF_SCOPE conf 0.4` 이관으로 뒤집혔다(JSON의 `predictedCategory`·`confidence`·`escalated`로 확인). 이관 임계값 0.6 근처 문항은 재측정마다 결과가 바뀔 수 있다.
+4. **HISTORY answer 후퇴(0.333→0.167)의 원인은 C1-07 한 건이다.** n=6이라 1문항이 0.167을 움직인다. 소표본에서 카테고리 평균의 해상도가 낮다 — 카테고리 평균이 아니라 문항 단위로 읽어야 한다.
+
+### 남은 실패 13문항의 원인 유형
+
+"실패"는 양 회차 모두 tool 0인 문항으로 정의한다. 이렇게 세면 13건이며 목록이 일치함을 JSON에서 확인했다(C1-02·C1-04·C1-06·C1-07·C2-01·C2-03·C2-04·C2-05·C3-02·C3-04·C4-01·C4-04·C4-05). 양 회차 모두 만점인 7문항(C1-05·C2-02·C2-06·C3-01·C3-06·C5-01·C5-04)도 JSON에서 확인했다.
+
+| 유형 | 문항 | JSON에서 확인한 바 | 원인 귀속 |
+|---|---|---|---|
+| `search_docs` 미호출 (기대에 있는데 호출 없음) | C1-02, C1-06, C2-01, C2-03, C3-02, C3-04, C4-04 (7건) | `used`·`expected` 대조. miss는 전부 docs 조항(403 규정·업적 공백·가중치 정의·겹침 정상·평가 없음) | D1 (audit-lazo) — 프롬프트 문구 수정으로는 안 고쳐지는 층위라는 것이 감사의 주장이다 |
+| `search_docs` 미호출 + 장르 공백 탐색 실패 | C4-01 | 동상. miss는 장르 공백 4건과 게임명 | D1 + D2의 `emptyGenre` 인자 미전달 (audit-lazo 주장. 행에 인자가 기록되지 않아 JSON에서는 미확인) |
+| 잘못된 도구 선택 | C2-04, C2-05 | `get_taste_profile` 기대에 `lookup_library` 호출. miss는 게임명·플레이타임·별점 | D2 (audit-lazo) — 취향 갭 줄이 `gameId`+`gap`만 싣는 것은 `tools.ts`에서 코드로 확인했다 |
+| 잘못된 도구 선택 | C4-05 | 3개 기대에 `search_docs`만 호출. 금칙 위반 "library.md에 별점 열" | 추정 (별점 위치 오해. JSON 근접 원인까지만 확인했고 귀속은 추정이다) |
+| 위시 게임인데 보유 인덱스만 조회 | C1-04 | miss "Hades II는 찜 목록". 보유 인덱스 조회 1건으로 miss 해소 불가 | D4 (audit-lazo) — 추정 표기 (부분일치 경로와의 단정은 불가하다) |
+| 분류 뒤집힘으로 경로 이탈 | C1-07 | 2차 OUT_OF_SCOPE 0.4 이관. miss 위시 51건 | D3 (audit-lazo) + 위 "분류 비결정" (JSON 확인) |
+
+D3·D5·D6은 13문항 표에는 직접 안 걸리지만 코드로 확인한 범위에서 적는다. D3: `assemble.ts`가 OUT_OF_SCOPE면 근거 조립을 건너뛰고(line 101), `KNOWN_TOOLS`에 `escalate`가 없다(코드 확인). C5-05(escalate 고정 문구, miss "계정 설정 변경 불가")와 C5-02·C1-07이 이 구조에 걸린다는 것이 감사의 귀속이다. D5: `verify.ts`의 `UNGROUNDED_NUMBER`는 답변 숫자를 근거 문자열과 대조한다(코드 확인). C1-01의 정답 "347시간"은 근거의 "20855분"과 문자열이 달라 규칙대로면 위반이다(JSON miss 확인) — 규칙을 지키면 틀리고 어기면 재생성되는 충돌이다. D6: `runSearchDocs`가 예측 카테고리로 청크 풀을 제한한다(코드 확인). 분류가 틀리면 필요한 문서가 검색 대상에서 사라지므로 D1·D3을 증폭한다.
+
+참고로 `search_docs`는 2차에서 기대 15건 중 호출 2건(C4-05·C4-06), 정합 1건(C4-06)이다(JSON 확인). 감사의 "1건"은 정합 기준의 수치로 읽힌다.
 
 ## (5) 파이프라인 구조도
 
