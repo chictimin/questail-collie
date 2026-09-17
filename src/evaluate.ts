@@ -11,7 +11,9 @@
  */
 
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { extractJsonPayload } from '@questail/core';
 import { runCollie } from './graph.js';
 import { createCallLlm } from './llm.js';
@@ -437,8 +439,24 @@ function printReport(rows: ExtendedRow[], fewshotSkipped: number): void {
   }
 }
 
-async function runEval(evalPath: string, goldPath: string, onlyTokens: string[], limit: number | undefined): Promise<void> {
-  const items = await loadEvalSet(evalPath);
+/** 저장소 루트 (src/의 부모). 결과 JSON에 절대경로(사용자명 노출)를 남기지 않기 위함. */
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * 결과 JSON 기록용 경로. 루트 안이면 루트 기준 상대경로(data/eval_set.csv 형태),
+ * 루트 밖이면 홈 경로가 섞여 있을 때만 basename, 그 외는 원래 값 그대로.
+ */
+export function repoRelative(p: string): string {
+  const abs = resolve(p);
+  const rel = relative(REPO_ROOT, abs);
+  if (rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)) {
+    return rel.split(sep).join('/');
+  }
+  if (abs.startsWith(homedir() + sep)) return basename(abs);
+  return p;
+}
+
+async function runEval(evalPath: string, goldPath: string, onlyTokens: string[], limit: number | undefined): Promise<void> {  const items = await loadEvalSet(evalPath);
   const gold = await loadGold(goldPath);
   let targets = items.filter((i) => i.split !== 'fewshot');
   const fewshotSkipped = items.length - targets.length;
@@ -539,8 +557,8 @@ async function runEval(evalPath: string, goldPath: string, onlyTokens: string[],
     JSON.stringify(
       {
         timestamp: ts,
-        evalFile: evalPath,
-        goldFile: goldPath,
+        evalFile: repoRelative(evalPath),
+        goldFile: repoRelative(goldPath),
         totals: {
           attempted: rows.length,
           scored: ok.length,

@@ -1,7 +1,7 @@
 {
   "timestamp": "20260917T041200",
-  "evalFile": "/Users/mjolnir/Desktop/code/questail-collie/data/eval_set.csv",
-  "goldFile": "/Users/mjolnir/Desktop/code/questail-collie/data/answer_gold.json",
+  "evalFile": "data/eval_set.csv",
+  "goldFile": "data/answer_gold.json",
   "totals": {
     "n": 27,
     "tool": 0.4444444444444444,

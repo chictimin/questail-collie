@@ -1,7 +1,7 @@
 {
   "timestamp": "20260917T045405",
-  "evalFile": "/Users/mjolnir/Desktop/code/questail-collie/data/eval_set.csv",
-  "goldFile": "/Users/mjolnir/Desktop/code/questail-collie/data/answer_gold.json",
+  "evalFile": "data/eval_set.csv",
+  "goldFile": "data/answer_gold.json",
   "totals": {
     "attempted": 27,
     "scored": 27,
