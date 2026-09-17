@@ -11,7 +11,7 @@
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@langchain/langgraph": "^0.2.0",
-    "@questail/core": "file:./vendor/questail-core-0.2.0.tgz",
+    "@questail/core": "https://github.com/chictimin/questail/releases/download/v0.2.0/questail-core-0.2.0.tgz",
     "dotenv": "^16.4.5",
     "hono": "^4.13.8"
   },

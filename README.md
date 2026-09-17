@@ -124,7 +124,6 @@ docs/           # 근거 산문 3종 + 청크 매핑표
 data/mock/      # 합성 목데이터 (아래 고지 참고)
 data/classify_cache.json  # 드라이런용 분류 결과 고정 (본측정에는 쓰지 않는다)
 public/         # 데모 단일 HTML
-vendor/         # @questail/core tarball
 REPORT.md       # 과제 보고서
 ```
 
@@ -134,4 +133,10 @@ REPORT.md       # 과제 보고서
 
 ## 의존 관계
 
-`@questail/core`를 npm 레지스트리가 아닌 `vendor/questail-core-0.2.0.tgz` tarball로 소비한다(`file:` 의존). 형제 프로젝트 [questail](https://github.com/chictimin/questail)의 코어 패키지를 tarball로 고정 소비한다. 아직 npm에 배포 전이라 이 방식을 쓰며, core 의존은 tarball이라 레지스트리 조회 없이 해결된다. 읽기 경로(라이브러리·프로필 로드)로만 쓴다. 수집·저장 경로는 건드리지 않는다.
+`@questail/core`를 GitHub Release에 첨부된 tarball URL로 소비한다. npm 레지스트리 조회 없이 해결되고, 빌드된 `dist/`가 들어 있어 소비자 측 빌드가 필요 없다.
+
+```json
+"@questail/core": "https://github.com/chictimin/questail/releases/download/v0.2.0/questail-core-0.2.0.tgz"
+```
+
+업그레이드는 URL의 버전만 바꾸고 `pnpm install` 한다. 형제 프로젝트 [questail](https://github.com/chictimin/questail)의 코어 패키지를 버전 고정 소비한다. 읽기 경로(라이브러리·프로필 로드)로만 쓴다. 수집·저장 경로는 건드리지 않는다.

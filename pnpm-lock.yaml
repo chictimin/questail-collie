@@ -15,8 +15,8 @@ importers:
         specifier: ^0.2.0
         version: 0.2.74(@langchain/core@0.3.80)(zod-to-json-schema@3.25.2(zod@3.25.76))
       '@questail/core':
-        specifier: file:./vendor/questail-core-0.2.0.tgz
-        version: file:vendor/questail-core-0.2.0.tgz
+        specifier: https://github.com/chictimin/questail/releases/download/v0.2.0/questail-core-0.2.0.tgz
+        version: https://github.com/chictimin/questail/releases/download/v0.2.0/questail-core-0.2.0.tgz
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1
@@ -235,8 +235,8 @@ packages:
       zod-to-json-schema:
         optional: true
 
-  '@questail/core@file:vendor/questail-core-0.2.0.tgz':
-    resolution: {integrity: sha512-nLh1zuNNMtMAEOs+xjRA1JGtS9vp8Tdx4i1r8QZRKEsnYkBrsASTw3eE+sMxeFKad8QRv7LiSFGGeQFafdUrOA==, tarball: file:vendor/questail-core-0.2.0.tgz}
+  '@questail/core@https://github.com/chictimin/questail/releases/download/v0.2.0/questail-core-0.2.0.tgz':
+    resolution: {integrity: sha512-UMUZ5GxHz11LBEkUlvwnc2eZAVbhOa1sK+HapLMh6JfzGlSd2YJTQWZIxEtVJcLYQznXDc+t19LJOJaDSa3qRg==, tarball: https://github.com/chictimin/questail/releases/download/v0.2.0/questail-core-0.2.0.tgz}
     version: 0.2.0
     hasBin: true
 
@@ -530,7 +530,7 @@ snapshots:
       - react
       - react-dom
 
-  '@questail/core@file:vendor/questail-core-0.2.0.tgz':
+  '@questail/core@https://github.com/chictimin/questail/releases/download/v0.2.0/questail-core-0.2.0.tgz':
     dependencies:
       zod: 3.25.76
 
