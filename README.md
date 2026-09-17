@@ -6,43 +6,70 @@ QuestTail 게임 라이브러리 라우팅 에이전트.
 
 ## 실행 요건
 
-실행에 LLM 엔드포인트가 필요하다. 분류·답변을 LLM이 만들기 때문이다. 아래 두 갈래 중 하나를 고른다.
+실행에 LLM 엔드포인트가 필요하다. 분류·답변을 LLM이 만들기 때문이다. 기본 경로는 원격이라 키가 필요하고, 키 없이 돌려보려면 로컬 대체 경로를 쓴다.
 
-### (a) 로컬 — Ollama
+### (a) 기본 — 원격 (키 필요)
+
+기본값은 base URL `https://opencode.ai/zen/go/v1`, 모델 `mimo-v2.5`다(OpenCode Go 플랜 전용 경로). 키만 설정하면 된다.
+
+```sh
+QUESTAIL_LLM_API_KEY=...
+```
+
+저장소 루트 `.env` 또는 전역 설정 파일 `~/.config/questail/.env`에 둔다(루트가 덮어쓴다). base URL·모델을 바꾸려면 `QUESTAIL_LLM_BASE_URL`·`QUESTAIL_LLM_MODEL`도 같은 파일에 둔다. OpenAI 호환이면 어디든 된다.
+
+### (b) 대체 — 로컬 Ollama (키 불필요)
 
 ```sh
 ollama serve         # 로컬 서버
 ollama pull qwen3:8b # 모델 받기 (약 5GB)
 ```
 
-기본값은 base URL `http://localhost:11434/v1`, 모델 `qwen3:8b`이다. 그대로 두면 설정이 필요 없다.
-
-### (b) 원격 — OpenAI 호환 엔드포인트
-
-OpenAI 호환이면 어디든 된다. 환경변수 세 개만 설정하면 코드 변경 없이 동작한다.
+그 뒤 환경변수 세 개를 로컬 값으로 둔다. 로컬호스트는 키 없이도 통과한다.
 
 ```sh
-QUESTAIL_LLM_BASE_URL=...
-QUESTAIL_LLM_API_KEY=...
-QUESTAIL_LLM_MODEL=...
+QUESTAIL_LLM_BASE_URL=http://localhost:11434/v1
+QUESTAIL_LLM_MODEL=qwen3:8b
 ```
-
-전역 설정 파일 `~/.config/questail/.env` 또는 저장소 루트 `.env` 둘 다 읽는다(루트가 덮어쓴다).
 
 ### 결과만 보고 싶은 경우
 
-> TODO(측정 후 — `data/results/` JSON과 REPORT.md (4)항이 채워지면 이 절을 갱신한다)
+LLM 키 없이도 읽을 수 있다. 측정 결과 JSON이 커밋되어 있어 clone만 하면 된다.
+
+- `data/results/20260917T041200.json` (1차), `data/results/20260917T045405.json` (2차)
+- `REPORT.md` (4)절에 두 측정의 비교·개선 사이클·실패 문항 인용이 정리돼 있다.
 
 ## 실행법
 
+검증된 순서대로 따라한다.
+
 ```sh
-pnpm install   # 의존성 설치
-pnpm dev       # 데모 서버 (http://localhost:3000)
-pnpm eval      # 평가셋 2지표 측정
+git clone https://github.com/chictimin/questail-collie.git && cd questail-collie
+pnpm install          # 의존성 설치
+# 키 설정: 저장소 루트 .env에 QUESTAIL_LLM_API_KEY=... (위 실행 요건 참고)
+pnpm dev              # 데모 서버 (http://localhost:3000)
+```
+
+키 설정이 없으면 화면은 뜨지만 질의가 안내 메시지로 실패한다. 크래시가 아니니 놀라지 않아도 된다.
+
+그 외 명령어:
+
+```sh
+pnpm eval      # 평가셋 2지표 측정 (LLM 키 필요)
 pnpm typecheck # 타입 검사
 ```
 
-데모 화면에서 질문을 입력하면 답변과 함께 호출한 도구·근거 문서 부분·검증 결과를 각각 볼 수 있다.
+`pnpm install` 직후 `Ignored build scripts: esbuild@0.28.2` 경고가 뜨지만 실행에 지장이 없다. 별도 조치가 필요 없다.
+
+## 데모 화면
+
+챗봇 레이아웃의 단일 화면이다. 질문·답변 말풍선이 위에 누적되고, 아래 입력창에서 계속 물을 수 있다.
+
+- 답변 생성 중에는 단계별 진행 표시가 나온다(카테고리 판정 → 도구 선택과 근거 조립 → 근거로 답변 생성 → 근거 이탈 검사). 각 단계 소요 시간이 함께 찍히고, 끝나면 경로 한 줄로 접힌다.
+- 답변 말풍선 아래 작은 글씨 메타 2줄에 분류 결과·confidence·호출한 도구·소요 시간·검증 결과·이관 여부가 붙는다. 위반이 있으면 규칙과 내용이 함께 나온다.
+- 근거는 접기/펼치기 형태다. 접힌 상태에서도 건수가 표시되고, 펼치면 문서 id와 텍스트를 대조할 수 있다.
+- 헤더에 현재 연결된 엔드포인트와 모델이 표시된다.
+- 응답에 20~40초 걸린다(LLM 3회 왕복). 멈춘 것이 아니니 진행 표시를 보고 기다린다.
 
 ## 디렉토리 구조
 

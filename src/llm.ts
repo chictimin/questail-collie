@@ -67,7 +67,7 @@ export function createCallLlm(): CollieDeps['callLlm'] {
   const endpoint = resolveLlmEndpoint();
   if (!endpoint.apiKey && !isLocalhostUrl(endpoint.baseUrl)) {
     throw new Error(
-      'LLM API 키가 없습니다. QUESTAIL_LLM_API_KEY 환경변수(전역 ~/.config/questail/.env 또는 저장소 .env)에 설정하십시오.',
+      'LLM API 키가 없습니다. QUESTAIL_LLM_API_KEY 환경변수(저장소 루트 .env 또는 전역 ~/.config/questail/.env)에 설정하십시오.',
     );
   }
   return (prompt: string, system?: string): Promise<string> =>
