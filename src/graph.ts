@@ -16,6 +16,7 @@ import { buildEscalationAnswer } from './nodes/escalate.js';
 import { verifyAnswer } from './nodes/verify.js';
 import type {
   AgentState,
+  AgentStep,
   ClassifyResult,
   CollieDeps,
   EvidenceChunk,
@@ -27,6 +28,18 @@ import type {
 
 const DEFAULT_CONFIDENCE_THRESHOLD = 0.6;
 const MAX_REGENERATIONS = 1;
+
+/**
+ * 노드 진입 알림 (데모 진행 표시용). onStep이 없으면(평가 하네스) 아무 일도 없다.
+ * 표시 때문에 그래프가 죽으면 안 되므로 콜백 예외는 삼킨다.
+ */
+function emitStep(deps: CollieDeps, step: AgentStep): void {
+  try {
+    deps.onStep?.(step);
+  } catch {
+    /* 진행 표시 실패는 답변에 영향 주지 않는다 */
+  }
+}
 
 const CollieState = Annotation.Root({
   question: Annotation<string>({
@@ -73,10 +86,12 @@ export const runCollie: RunCollie = async (question, deps) => {
   // (langgraph가 채널명과 노드명 충돌을 런타임에 거부한다).
   const graph = new StateGraph(CollieState)
     .addNode('classify_step', async (state) => {
+      emitStep(deps, 'classify');
       const classify = await classifyQuestion(state.question, deps.callLlm);
       return { classify };
     })
     .addNode('escalate', (state) => {
+      emitStep(deps, 'escalate');
       const classify = state.classify ?? {
         category: 'OUT_OF_SCOPE' as const,
         confidence: 0,
@@ -89,13 +104,17 @@ export const runCollie: RunCollie = async (question, deps) => {
       return { answer: buildEscalationAnswer(classify), escalated: true, toolCalls };
     })
     .addNode('assemble_context', async (state) => {
+      emitStep(deps, 'assemble');
       const category = state.classify?.category ?? 'OUT_OF_SCOPE';
       const { evidence, toolCalls } = await assembleContext(state.question, category, deps);
       return { evidence, toolCalls };
     })
     .addNode('answer_step', async (state) => {
-      const category = state.classify?.category ?? 'OUT_OF_SCOPE';
+      // 재생성 판정은 regenerated 카운터가 아니라 verify 실패 여부로 한다.
+      // 카운터는 이 노드 종료 시점에 올라가므로, 재생성 진입 시점에는 아직 0이다.
       const retrying = state.verify !== undefined && !state.verify.passed;
+      emitStep(deps, retrying ? 'regenerate' : 'answer');
+      const category = state.classify?.category ?? 'OUT_OF_SCOPE';
       const answer = await answerQuestion(
         state.question,
         category,
@@ -111,6 +130,7 @@ export const runCollie: RunCollie = async (question, deps) => {
       };
     })
     .addNode('verify_step', (state) => {
+      emitStep(deps, 'verify');
       const verify = verifyAnswer(
         state.answer ?? '',
         state.classify?.category ?? 'OUT_OF_SCOPE',
@@ -149,6 +169,8 @@ export const runCollie: RunCollie = async (question, deps) => {
   })) as CollieSnapshot;
 
   const toolsUsed = [...new Set(final.toolCalls.map((t) => t.tool))];
+  // evidence 본문과 evidenceIds는 같은 배열에서 나온다 (id 역조회 금지 — 동적 청크는 chunks에 없다).
+  const evidence = final.evidence;
   return {
     question,
     category: final.classify?.category ?? 'OUT_OF_SCOPE',
@@ -156,7 +178,8 @@ export const runCollie: RunCollie = async (question, deps) => {
     answer: final.answer ?? '',
     escalated: final.escalated,
     toolsUsed,
-    evidenceIds: final.evidence.map((e) => e.id),
+    evidenceIds: evidence.map((e) => e.id),
+    evidence,
     verify: final.verify ?? { passed: true, violations: [] },
     elapsedMs: Date.now() - started,
   } satisfies RunResult;

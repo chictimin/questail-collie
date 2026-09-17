@@ -106,6 +106,12 @@ export interface RunResult {
   /** 측정의 "실제 호출한 도구 집합" */
   toolsUsed: ToolName[];
   evidenceIds: string[];
+  /**
+   * 실제로 쓴 근거 본문. id만으로는 복원할 수 없다 —
+   * 도구 실행 결과 청크(D-A#lookup:0 등)는 그때 생성되어 deps.chunks에 없기 때문이다.
+   * 화면이 답변과 근거를 대조하려면 본문이 결과에 실려 있어야 한다.
+   */
+  evidence: EvidenceChunk[];
   verify: VerifyResult;
   elapsedMs: number;
 }
@@ -120,7 +126,22 @@ export interface CollieDeps {
   callLlm: (prompt: string, system?: string) => Promise<string>;
   /** 이관 임계값. 기본 0.6 */
   confidenceThreshold?: number;
+  /**
+   * 진행 단계 알림. 그래프가 각 노드에 진입할 때 호출한다.
+   * 화면이 "멈춘 것"과 "진행 중"을 구분하기 위한 것이므로 실제 진입 시점에만 부른다 —
+   * 예상 시간으로 흉내 내지 않는다. 미지정이면 아무 일도 하지 않는다.
+   */
+  onStep?: (step: AgentStep) => void;
 }
+
+/** 진행 단계. 화면 표시 문구가 아니라 식별자다 — 문구는 표시 계층이 정한다. */
+export type AgentStep =
+  | 'classify' // 카테고리 판정
+  | 'assemble' // 도구 선택 + 근거 조립
+  | 'answer' // 근거로 답변 생성
+  | 'verify' // 기계적 이탈 검사
+  | 'regenerate' // 검증 실패 후 재생성 (상한 1회)
+  | 'escalate'; // 이관
 
 export type RunCollie = (question: string, deps: CollieDeps) => Promise<RunResult>;
 
