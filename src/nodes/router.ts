@@ -71,6 +71,20 @@ function topNOf(question: string): number | undefined {
   return undefined;
 }
 
+/**
+ * 플레이타임 순위 질문의 정렬 방향. 방향어가 없으면 null이다.
+ * null이면 topByPlaytime을 아예 붙이지 않는다 — 방향을 모른 채 내림차순으로
+ * 답하면 "가장 적게 한 게임"에 최다 플레이 게임을 답하게 된다.
+ * 오답보다 무근거가 낫다는 판단이다.
+ */
+function playtimeOrderOf(question: string): 'asc' | 'desc' | null {
+  const asc = has(question, '적게', '적은', '짧', '최소', '조금', '덜 ', '낮은 플레이');
+  const desc = has(question, '오래', '오랜', '길게', '긴 ', '많이', '많은', '최다', '최대', '붙잡');
+  if (asc && !desc) return 'asc';
+  if (desc && !asc) return 'desc';
+  return null;
+}
+
 type CoverageField = 'genre' | 'developers' | 'achievement' | 'rating';
 
 /** 결측·보유 질문의 대상 필드. 필드 이름 키워드에서만 유도한다. */
@@ -109,7 +123,12 @@ function selectHistory(question: string, deps: CollieDeps, primaryTitle: string 
   const genre = genreOf(question, deps);
   if (genre) args.genre = genre;
   const top = topNOf(question);
-  if (top !== undefined) args.topByPlaytime = top;
+  const order = playtimeOrderOf(question);
+  // 방향이 확정될 때만 순위 조회다. 방향어가 없으면 순위 질문으로 보지 않는다.
+  if (top !== undefined && order !== null) {
+    args.topByPlaytime = top;
+    args.playtimeOrder = order;
+  }
   if (args.titleOrKeyword === undefined && args.genre === undefined && args.topByPlaytime === undefined) {
     args.titleOrKeyword = question;
   }
@@ -128,7 +147,21 @@ function selectTaste(question: string, deps: CollieDeps): RoutedCall[] {
   if (wantShortHigh) return [{ tool: 'find_rating_playtime_gaps', args: { direction: 'short_high' } }];
   const genre = genreOf(question, deps);
   if (genre && has(question, '제일', '순위', '오래', '많이', '상위', 'top', '1위', '가장')) {
-    return [{ tool: 'lookup_library', args: { genre, topByPlaytime: topNOf(question) ?? 1 } }];
+    return [{
+      tool: 'lookup_library',
+      args: {
+        genre,
+        topByPlaytime: topNOf(question) ?? 1,
+        playtimeOrder: playtimeOrderOf(question) ?? 'desc',
+      },
+    }];
+  }
+  // 장르가 없어도 플레이타임 최대·최소 질의는 개별 게임 조회다.
+  // 취향 프로필에는 분포 통계만 있고 게임별 행이 없어 "근거가 없다"로 끝난다.
+  const top = topNOf(question);
+  const order = playtimeOrderOf(question);
+  if (top !== undefined && order !== null && has(question, '플레이', '플레이타임', '시간')) {
+    return [{ tool: 'lookup_library', args: { topByPlaytime: top, playtimeOrder: order } }];
   }
   return [{ tool: 'get_taste_profile', args: {} }];
 }

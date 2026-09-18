@@ -72,6 +72,11 @@ export interface LookupArgs {
   genre?: string;
   emptyGenre?: boolean;
   topByPlaytime?: number;
+  /**
+   * topByPlaytime의 정렬 방향. 'desc'(기본)는 최다 플레이, 'asc'는 최소 플레이다.
+   * 방향이 없으면 "가장 적게 플레이한 게임"이 최다 플레이 게임으로 뒤집힌다.
+   */
+  playtimeOrder?: 'asc' | 'desc';
 }
 
 function parseLookupArgs(args: Record<string, unknown>): LookupArgs {
@@ -85,7 +90,22 @@ function parseLookupArgs(args: Record<string, unknown>): LookupArgs {
   if (typeof top === 'number' && Number.isFinite(top) && top > 0) {
     out.topByPlaytime = Math.min(50, Math.floor(top));
   }
+  const order = strArg(args, 'playtimeOrder');
+  if (order === 'asc' || order === 'desc') out.playtimeOrder = order;
   return out;
+}
+
+/** 적용된 필터를 사람이 읽는 한 줄로 만든다 (근거의 모수 표기용). */
+function describeLookupArgs(args: LookupArgs): string {
+  const parts: string[] = [];
+  if (args.titleOrKeyword) parts.push(`제목/키워드 "${args.titleOrKeyword}"`);
+  if (args.genre) parts.push(`장르 ${args.genre}`);
+  if (args.emptyGenre) parts.push('장르 결측');
+  if (args.topByPlaytime !== undefined) {
+    const dir = args.playtimeOrder === 'asc' ? '가장 적은' : '가장 많은';
+    parts.push(`플레이타임 ${dir} 순 상위 ${args.topByPlaytime}건`);
+  }
+  return parts.length > 0 ? parts.join(', ') : '없음';
 }
 
 /**
@@ -119,7 +139,16 @@ export function runLookupLibrary(
     rows = rows.filter((g) => !g.genres || g.genres.length === 0);
   }
   if (args.topByPlaytime !== undefined) {
-    rows = [...rows].sort((a, b) => b.playtimeMinutes - a.playtimeMinutes).slice(0, args.topByPlaytime);
+    const asc = args.playtimeOrder === 'asc';
+    const sorted = [...rows].sort((a, b) =>
+      asc ? a.playtimeMinutes - b.playtimeMinutes : b.playtimeMinutes - a.playtimeMinutes);
+    const n = Math.min(args.topByPlaytime, sorted.length);
+    // 동률은 자르지 않는다. 0분 게임이 여러 개인데 "가장 적은 게임"으로
+    // 임의의 한 건만 답하면 근거가 답을 확정하지 못한다. 상한 50건.
+    let end = n;
+    const boundary = n > 0 ? sorted[n - 1].playtimeMinutes : undefined;
+    while (end < sorted.length && end < 50 && sorted[end].playtimeMinutes === boundary) end++;
+    rows = sorted.slice(0, end);
   }
   const id = (i: number): string => `D-A#lookup:${i}`;
   if (rows.length === 0) {
@@ -128,17 +157,21 @@ export function runLookupLibrary(
       docId: 'D-A' as DocId,
       categories: [category],
       heading: '라이브러리 조회 결과 없음',
-      text: `lookup_library: 조건에 맞는 게임이 없다 (${JSON.stringify(args)})`,
+      text: `lookup_library: 전체 보유 ${library.games.length}건 중 조건에 맞는 게임이 없다 (조건: ${describeLookupArgs(args)})`,
     }];
   }
   const capped = rows.slice(0, 20);
   const more = rows.length > capped.length ? `\n외 ${rows.length - capped.length}건 생략` : '';
+  // 모수(전체 보유 수)와 필터 조건을 근거에 함께 남긴다.
+  // 이게 없으면 답변 LLM이 "조회 1건"을 "라이브러리에 1개뿐"으로 읽는다.
+  const total = library.games.length;
+  const scope = `전체 보유 ${total}건 중 조건에 맞는 ${rows.length}건 (조건: ${describeLookupArgs(args)})`;
   return [{
     id: id(0),
     docId: 'D-A' as DocId,
     categories: [category],
-    heading: `라이브러리 조회 ${rows.length}건`,
-    text: `${capped.map(renderRow).join('\n')}${more}\n${generatedAtLine(library)}`,
+    heading: `라이브러리 조회 ${rows.length}건 / 전체 ${total}건`,
+    text: `${scope}\n${capped.map(renderRow).join('\n')}${more}\n${generatedAtLine(library)}`,
   }];
 }
 
