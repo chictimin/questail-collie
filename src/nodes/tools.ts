@@ -52,8 +52,20 @@ function generatedAtLine(library: LibraryIndex): string {
   return `라이브러리 기준 시각(generated_at): ${formatIndexTs(library.generatedAt)} (${library.generatedAt})`;
 }
 
+/**
+ * 플레이타임(분) 단일 표기. 분과 시간(약, 내림)을 함께 남긴다.
+ * verify의 checkUngroundedNumbers가 답변 속 숫자를 근거 문자열에서 대조하므로
+ * 시간 표기(예: 347)가 근거에 없으면 "몇 시간" 정답이 위반으로 잡힌다 (C1-01).
+ * 0 이하·비유한 값은 기존 표기(`${minutes}분`) 그대로 둔다 — 없던 문구를 만들지 않는다.
+ * 분→시간 환산은 이 함수가 유일한 출처다. 렌더 지점은 직접 나누지 말고 이 함수를 쓴다.
+ */
+function formatPlaytimeMinutes(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes <= 0) return `${minutes}분`;
+  return `${minutes}분(약 ${Math.floor(minutes / 60)}시간)`;
+}
+
 function renderRow(g: NormalizedGame): string {
-  const parts = [`${g.title} (${g.platform}/${g.id})`, `플레이타임 ${g.playtimeMinutes}분`];
+  const parts = [`${g.title} (${g.platform}/${g.id})`, `플레이타임 ${formatPlaytimeMinutes(g.playtimeMinutes)}`];
   if (g.achievementPercent !== undefined) parts.push(`업적 ${g.achievementPercent}%`);
   if (g.genres && g.genres.length > 0) parts.push(`장르 ${g.genres.join(', ')}`);
   if (g.lastPlayedAt !== undefined) {
@@ -499,7 +511,7 @@ export async function runRatingPlaytimeGaps(
     const note = entries.find((e) => e.gameId === g.gameId);
     if (!row || note?.rating === undefined) continue;
     const title = row.title !== '' ? row.title : g.gameId;
-    lines.push(`${title} | 플레이타임 ${row.playtimeMinutes}분 | 별점 ${note.rating} (gap ${g.gap})`);
+    lines.push(`${title} | 플레이타임 ${formatPlaytimeMinutes(row.playtimeMinutes)} | 별점 ${note.rating} (gap ${g.gap})`);
     if (lines.length >= 3) break;
   }
   if (lines.length === 0) {
